@@ -1,0 +1,24 @@
+サーバーの起動の仕方
+
+【フロント（client）側】
+1:cmdでclientフォルダへ
+2:npm startコマンドを打つ
+
+【バック（server）側】
+1:cmdでserverフォルダへ行く
+2:node server.jsコマンドを打つ
+
+
+設計のこと：店舗認証のときに書き始めた
+【LINE公式アカウントとの連携】
+・フロントエンド:新規登録と決済登録、その他関連ページ。「AccountLinkerPage.jsx」「ForgotPasswordPage.jsx」「PaymentPage.jsx」「RegisterPage.jsx」「UpdatePasswordPage.jsx」「index.html」と全体用の「App.jsx」「index.jsx」
+・バックエンド:4.エンドポイントのapp.post("/api/link-line-account")のところまで
+・stripeはここでのみ試用
+・supabaseは「profiles」「survey_responses」の二つで記録
+
+【店舗認証フロー】
+・フロントエンド:デジタル会員証とその後のアンケート部分。「StoreCheckinPage.jsx」「MembershipCardPage.jsx」「」「」と全体用の「App.jsx」「index.jsx」
+・バックエンド:4.エンドポイントのapp.post('/api/check-in')、app.post("/api/submit-visit-survey")、app.get("/api/membership-card")app.get('/api/visit-history')の部分。
+・supabaseは、既存の「profiles」からは読み取りを、「stores」「visits」でそれぞれ店舗情報と来店履歴・来店アンケートを記録
+
+
