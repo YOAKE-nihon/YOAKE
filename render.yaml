@@ -1,0 +1,53 @@
+# Render Blueprint Configuration
+# プロジェクトルートに配置: yoake/render.yaml
+
+services:
+  # バックエンドAPI (Node.js)
+  - type: web
+    name: yoake-api
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: cd server && npm install && npm run build
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      # 以下は手動で設定（Renderダッシュボードで）
+      # - key: LINE_LOGIN_CHANNEL_ID
+      #   sync: false
+      # - key: LINE_MESSAGING_API_TOKEN
+      #   sync: false
+      # - key: SUPABASE_URL
+      #   sync: false
+      # - key: SUPABASE_SERVICE_KEY
+      #   sync: false
+      # - key: STRIPE_SECRET_KEY
+      #   sync: false
+    healthCheckPath: /health
+
+  # フロントエンド (Static Site)
+  - type: web
+    name: yoake-app
+    env: static
+    region: oregon
+    plan: starter
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: ./client/build
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

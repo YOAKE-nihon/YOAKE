@@ -6,16 +6,22 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
-    "build": "tsc",
+    "build": "tsc && cp -r src/scripts dist/",
+    "build:clean": "rm -rf dist && npm run build",
     "setup-richmenu": "node dist/scripts/setup-rich-menus.js",
     "check-liff": "node dist/scripts/check-liff-config.js",
     "debug-richmenu": "node dist/scripts/debug-rich-menu.js",
     "type-check": "tsc --noEmit",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postbuild": "echo 'Build completed successfully'"
   },
   "keywords": ["line", "liff", "stripe", "supabase", "typescript"],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "dependencies": {
     "@line/bot-sdk": "^10.0.0",
     "@supabase/supabase-js": "^2.49.10",
