@@ -1,0 +1,251 @@
+-- YOAKE Database Schema
+-- Execute this in your Supabase SQL editor
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Users table
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  phone VARCHAR(50),
+  gender VARCHAR(20),
+  birth_date DATE NOT NULL,
+  line_user_id VARCHAR(255) UNIQUE,
+  stripe_customer_id VARCHAR(255) UNIQUE,
+  password_reset_token VARCHAR(255),
+  password_reset_expires TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- User profiles table
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  industry VARCHAR(100) NOT NULL,
+  job_type VARCHAR(100) NOT NULL,
+  experience_years VARCHAR(50) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Surveys table
+CREATE TABLE surveys (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  interest_in_side_job VARCHAR(50) NOT NULL,
+  side_job_time VARCHAR(50),
+  side_job_fields TEXT[] DEFAULT '{}',
+  side_job_fields_other TEXT,
+  side_job_purpose TEXT,
+  side_job_challenge TEXT,
+  side_job_challenge_other TEXT,
+  meet_people TEXT[] DEFAULT '{}',
+  service_benefit VARCHAR(100) NOT NULL,
+  service_benefit_other TEXT,
+  service_priority VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Stores table
+CREATE TABLE stores (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  address TEXT NOT NULL,
+  coordinates JSONB,
+  qr_data TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Visits table
+CREATE TABLE visits (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+  check_in_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  visit_type VARCHAR(20) CHECK (visit_type IN ('single', 'group')),
+  visit_purpose VARCHAR(100),
+  companion_industries TEXT[] DEFAULT '{}',
+  companion_job_types TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create indexes for better performance
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_line_user_id ON users(line_user_id);
+CREATE INDEX idx_users_stripe_customer_id ON users(stripe_customer_id);
+CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX idx_surveys_user_id ON surveys(user_id);
+CREATE INDEX idx_visits_user_id ON visits(user_id);
+CREATE INDEX idx_visits_store_id ON visits(store_id);
+CREATE INDEX idx_visits_check_in_at ON visits(check_in_at);
+
+-- Create updated_at trigger function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Apply updated_at trigger to tables
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON user_profiles
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Insert sample stores
+INSERT INTO stores (id, name, address, qr_data) VALUES
+(
+  uuid_generate_v4(),
+  'YOAKE 渋谷店',
+  '東京都渋谷区渋谷1-1-1',
+  '{"app":"yoake","type":"check-in","store_id":"shibuya"}'
+),
+(
+  uuid_generate_v4(),
+  'YOAKE 新宿店',
+  '東京都新宿区新宿2-2-2',
+  '{"app":"yoake","type":"check-in","store_id":"shinjuku"}'
+),
+(
+  uuid_generate_v4(),
+  'YOAKE 大阪梅田店',
+  '大阪府大阪市北区梅田3-3-3',
+  '{"app":"yoake","type":"check-in","store_id":"umeda"}'
+);
+
+-- Create RLS (Row Level Security) policies
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE surveys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE visits ENABLE ROW LEVEL SECURITY;
+
+-- Users can only see their own data
+CREATE POLICY "Users can view own data" ON users
+  FOR SELECT USING (line_user_id = current_setting('request.jwt.claims', true)::json->>'line_user_id');
+
+CREATE POLICY "Users can update own data" ON users
+  FOR UPDATE USING (line_user_id = current_setting('request.jwt.claims', true)::json->>'line_user_id');
+
+-- Service role can access all data (for backend operations)
+CREATE POLICY "Service role can access all users" ON users
+  FOR ALL USING (current_setting('role') = 'service_role');
+
+CREATE POLICY "Service role can access all profiles" ON user_profiles
+  FOR ALL USING (current_setting('role') = 'service_role');
+
+CREATE POLICY "Service role can access all surveys" ON surveys
+  FOR ALL USING (current_setting('role') = 'service_role');
+
+CREATE POLICY "Service role can access all visits" ON visits
+  FOR ALL USING (current_setting('role') = 'service_role');
+
+-- Stores are publicly readable
+CREATE POLICY "Stores are publicly readable" ON stores
+  FOR SELECT USING (true);
+
+-- Create functions for analytics
+CREATE OR REPLACE FUNCTION get_user_visit_stats(user_uuid UUID)
+RETURNS JSON AS $$
+DECLARE
+  result JSON;
+BEGIN
+  SELECT json_build_object(
+    'total_visits', COUNT(*),
+    'favorite_store', (
+      SELECT s.name 
+      FROM stores s 
+      WHERE s.id = (
+        SELECT store_id 
+        FROM visits 
+        WHERE user_id = user_uuid 
+        GROUP BY store_id 
+        ORDER BY COUNT(*) DESC 
+        LIMIT 1
+      )
+    ),
+    'recent_visits', (
+      SELECT json_agg(
+        json_build_object(
+          'date', check_in_at,
+          'store_name', s.name
+        ) ORDER BY check_in_at DESC
+      )
+      FROM visits v
+      JOIN stores s ON v.store_id = s.id
+      WHERE v.user_id = user_uuid
+      LIMIT 5
+    )
+  ) INTO result
+  FROM visits
+  WHERE user_id = user_uuid;
+  
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create function for visit analytics
+CREATE OR REPLACE FUNCTION get_user_visit_analytics(user_uuid UUID)
+RETURNS JSON AS $$
+DECLARE
+  result JSON;
+BEGIN
+  SELECT json_build_object(
+    'companion_industry', (
+      SELECT json_object_agg(industry, count)
+      FROM (
+        SELECT unnest(companion_industries) as industry, COUNT(*) as count
+        FROM visits 
+        WHERE user_id = user_uuid AND companion_industries IS NOT NULL
+        GROUP BY industry
+      ) t
+    ),
+    'companion_job_type', (
+      SELECT json_object_agg(job_type, count)
+      FROM (
+        SELECT unnest(companion_job_types) as job_type, COUNT(*) as count
+        FROM visits 
+        WHERE user_id = user_uuid AND companion_job_types IS NOT NULL
+        GROUP BY job_type
+      ) t
+    ),
+    'visit_purpose', (
+      SELECT json_object_agg(visit_purpose, count)
+      FROM (
+        SELECT visit_purpose, COUNT(*) as count
+        FROM visits 
+        WHERE user_id = user_uuid AND visit_purpose IS NOT NULL
+        GROUP BY visit_purpose
+      ) t
+    )
+  ) INTO result;
+  
+  RETURN result;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated;
+
+-- Comments for documentation
+COMMENT ON TABLE users IS 'Main user accounts table';
+COMMENT ON TABLE user_profiles IS 'Extended user profile information';
+COMMENT ON TABLE surveys IS 'User survey responses for onboarding';
+COMMENT ON TABLE stores IS 'Physical store locations';
+COMMENT ON TABLE visits IS 'User check-in records at stores';
+
+COMMENT ON COLUMN users.line_user_id IS 'LINE user ID for account linking';
+COMMENT ON COLUMN users.stripe_customer_id IS 'Stripe customer ID for payments';
+COMMENT ON COLUMN visits.visit_type IS 'single or group visit type';
+COMMENT ON COLUMN visits.companion_industries IS 'Industries of companions (for group visits)';
+COMMENT ON COLUMN visits.companion_job_types IS 'Job types of companions (for group visits)';
+
+-- Refresh the schema
+NOTIFY pgrst, 'reload schema';

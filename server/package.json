@@ -1,17 +1,19 @@
 {
   "name": "yoake-server",
   "version": "1.0.0",
-  "description": "YOAKE Backend Server",
-  "main": "server.js",
+  "description": "YOAKE Backend Server with TypeScript",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "setup-richmenu": "node scripts/setup-rich-menus.js",
-    "check-liff": "node scripts/check-liff-config.js",
-    "debug-richmenu": "node scripts/debug-rich-menu.js",
+    "start": "node dist/server.js",
+    "dev": "nodemon src/server.ts",
+    "build": "tsc",
+    "setup-richmenu": "node dist/scripts/setup-rich-menus.js",
+    "check-liff": "node dist/scripts/check-liff-config.js",
+    "debug-richmenu": "node dist/scripts/debug-rich-menu.js",
+    "type-check": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["line", "liff", "stripe", "supabase"],
+  "keywords": ["line", "liff", "stripe", "supabase", "typescript"],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -26,6 +28,11 @@
     "stripe": "^18.2.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "nodemon": "^3.1.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   }
 }

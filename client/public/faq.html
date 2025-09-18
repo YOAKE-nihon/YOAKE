@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOAKE よくある質問（Q&A）</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      background-color: #f8f9fa;
+      color: #212529;
+      margin: 0;
+    }
+    .faq-container {
+      background-color: #ffffff;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 1.8em;
+      text-align: center;
+      margin-top: 1em;
+      margin-bottom: 1.5em;
+      color: #343a40;
+    }
+    section {
+      margin-bottom: 2.5em;
+    }
+    h2 {
+      font-size: 1.4em;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #007bff;
+      color: #343a40;
+      margin-bottom: 1.5em;
+    }
+    .qa {
+      margin-bottom: 1.5em;
+      border-left: 3px solid #e9ecef;
+      padding-left: 15px;
+    }
+    .qa h3, .qa p {
+      margin: 0;
+      padding-left: 2em;
+      position: relative;
+    }
+    .qa h3 {
+      font-size: 1.1em;
+      color: #007bff;
+      margin-bottom: 0.5em;
+    }
+    .qa p {
+      font-size: 1em;
+      color: #495057;
+    }
+    .qa h3::before, .qa p::before {
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-weight: 600;
+      width: 1.5em;
+      text-align: center;
+    }
+    .qa h3::before {
+      content: 'Q';
+      color: #ffffff;
+      background-color: #007bff;
+      border-radius: 50%;
+      line-height: 1.5em;
+    }
+    .qa p::before {
+      content: 'A';
+      color: #868e96;
+      font-size: 1.2em;
+    }
+    a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .page-footer {
+      padding: 40px 0;
+      background-color: #e9e7e2;
+      border-top: 1px solid #ddd;
+      text-align: center;
+    }
+    .footer-nav {
+      margin-bottom: 20px;
+    }
+    .contact-button {
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: #ffffff;
+      font-size: 0.9rem;
+      transition: all 0.3s ease;
+    }
+    .logo {
+      font-size: 1.8rem;
+      color: #5C4033;
+    }
+    @media (min-width: 768px) {
+      body { background-color: #f0f2f5; }
+      .faq-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+      h1 { font-size: 2em; }
+      h2 { font-size: 1.5em; }
+    }
+  </style>
+</head>
+<body>
+  <main class="faq-container">
+    <h1>よくある質問（Q&A）</h1>
+
+    <section>
+      <h2>サービス概要・仕組み</h2>
+      <div class="qa">
+        <h3>YOAKEってどんなサービスですか？</h3>
+        <p>本サービスと提携しているカフェで一部のドリンクが無料になるサブスクリプション型サービスです。月額980円で会員になることができ、LINE連携により手軽に利用できます。</p>
+      </div>
+      <div class="qa">
+        <h3>誰でも利用できますか？</h3>
+        <p>はい、どなたでもご登録いただけますし、ご自由にお使いいただけます。</p>
+      </div>
+      <div class="qa">
+        <h3>利用にはLINE連携が必要ですか？</h3>
+        <p>はい。必須でございます。本サービスはLINE連携を前提に設計されています。LINEのユーザー情報（名前・アイコン）を使って本人確認を行います。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>登録・決済・料金関連</h2>
+      <div class="qa">
+        <h3>会員登録はどこから行えますか？</h3>
+        <p>LINEリッチメニューにある「新規登録」ボタンから登録画面へ進むことができます。</p>
+      </div>
+      <div class="qa">
+        <h3>料金はいくらかかりますか？</h3>
+        <p>月額980円（税込）でご利用いただけます。</p>
+      </div>
+      <div class="qa">
+        <h3>支払い方法は？クレジットカード以外は使えますか？</h3>
+        <p>現在は、クレジットカード決済に対応しています。その他の決済方法には今後対応を検討していきます。</p>
+      </div>
+      <div class="qa">
+        <h3>解約方法を教えてください。</h3>
+        <p>お問い合わせフォームから解約申請を行ってください。解約後も次回請求日まではご利用いただけます。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>ドリンクの利用に関して</h2>
+      <div class="qa">
+        <h3>無料で飲めるドリンクにはどんなものがありますか？</h3>
+        <p>提携店舗ごとに異なりますが、コーヒーや紅茶など一部の対象ドリンクが無料となります。詳細はLINEメニュー内「ドリンク一覧」からご確認いただけます。</p>
+      </div>
+      <div class="qa">
+        <h3>どのカフェで利用できますか？</h3>
+        <p>提携中のカフェは、LINEメニューからご確認いただけます。大阪府内を中心に順次拡大予定です。</p>
+      </div>
+      <div class="qa">
+        <h3>注文の際に必要なものはありますか？</h3>
+        <p>ご注文の前に、各カフェ店舗に設置しております「YOAKE来店用QRコード」を読み取ったのちに、クーポンが発行されますので、そのクーポンを店員にお見せください。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>アンケート・情報の扱い</h2>
+      <div class="qa">
+        <h3>アンケートは必須ですか？</h3>
+        <p>はい、簡単なアンケートにご回答いただくことで登録が完了します。</p>
+      </div>
+       <div class="qa">
+        <h3>アンケート結果は誰かと共有されますか？</h3>
+        <p>現時点では、アンケート結果を第三者に共有することはありません。ただし、将来的に共有を行う可能性がある場合は、事前にご案内いたします。</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>トラブル対応・問い合わせ</h2>
+      <div class="qa">
+        <h3>決済が通らない場合はどうしたらいいですか？</h3>
+        <p>クレジットカードの有効期限や限度額をご確認の上、再度お試しください。それでも解決しない場合は、お問い合わせフォームからご連絡ください。</p>
+      </div>
+      <div class="qa">
+        <h3>LINEアカウントを変更した場合はどうなりますか？</h3>
+        <p>現在、LINE連携がアカウント単位で行われているため、アカウント変更時は再登録が必要になる可能性があります。対応方法は順次ご案内予定です。</p>
+      </div>
+    </section>
+  </main>
+  <footer class="page-footer">
+    <div class="footer-inner">
+        <div class="footer-nav">
+            <a href="./contact.html" class="contact-button">お問い合わせ</a>
+        </div>
+        <p class="logo">YOAKE</p>
+    </div>
+  </footer>
+</body>
+</html>
