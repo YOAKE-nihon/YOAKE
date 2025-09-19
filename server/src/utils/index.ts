@@ -251,7 +251,6 @@ export const parseLineIdToken = (idToken: string): any => {
       return null;
     }
     
-    // This is a simplified version - in production, you should verify the token properly
     const parts = idToken.split('.');
     if (parts.length !== 3) {
       return null;
