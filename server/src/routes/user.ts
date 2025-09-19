@@ -1,455 +1,334 @@
 import { Router, Request, Response } from 'express';
 import { 
   CheckInRequest, 
-  SubmitVisitSurveyRequest, 
-  AppError 
+  SubmitVisitSurveyRequest,
+  AppError,
+  Visit
 } from '../types';
 import { 
   createSuccessResponse, 
-  createErrorResponse, 
-  parseQRCodeData,
-  getCurrentTimestamp 
+  createErrorResponse,
+  parseQRData,
+  getCurrentTimestamp,
+  validateQRData
 } from '../utils';
 import { db } from '../services/database';
 import { lineService } from '../services/line';
+import { 
+  rateLimitMiddleware,
+  asyncWrapper 
+} from '../middleware';
 
 const router = Router();
 
 /**
  * POST /api/check-in
- * Handle store check-in via QR code
+ * Check in to a store using QR code data
  */
-router.post('/check-in', async (req: Request, res: Response) => {
-  try {
-    const { lineUserId, storeId }: CheckInRequest = req.body;
+router.post('/check-in', 
+  rateLimitMiddleware,
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { lineUserId, storeId }: CheckInRequest = req.body;
 
-    if (!lineUserId || !storeId) {
-      return res.status(400).json(
-        createErrorResponse('LINE IDと店舗IDが必要です')
-      );
-    }
+      if (!lineUserId || !storeId) {
+        res.status(400).json(createErrorResponse('LINE IDと店舗IDが必要です'));
+        return;
+      }
 
-    // Get user by LINE ID
-    const user = await db.getUserByLineId(lineUserId);
-    if (!user) {
-      return res.status(404).json(
-        createErrorResponse('ユーザーが見つかりません。アカウント連携を完了してください。')
-      );
-    }
+      // Get user by LINE ID
+      const user = await db.getUserByLineId(lineUserId);
+      if (!user) {
+        res.status(404).json(createErrorResponse('ユーザーが見つかりません。アカウント連携を完了してください。'));
+        return;
+      }
 
-    // Verify store exists
-    const store = await db.getStoreById(storeId);
-    if (!store) {
-      return res.status(404).json(
-        createErrorResponse('指定された店舗が見つかりません')
-      );
-    }
+      // Verify store exists
+      const store = await db.getStoreById(storeId);
+      if (!store) {
+        res.status(404).json(createErrorResponse('店舗が見つかりません'));
+        return;
+      }
 
-    // Check if user has already checked in today at this store
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-    const existingVisits = await db.getVisitsByUserId(user.id, {
-      dateFrom: `${today}T00:00:00Z`,
-      dateTo: `${today}T23:59:59Z`,
-    });
-
-    const todayVisitAtStore = existingVisits.find(visit => visit.store_id === storeId);
-    if (todayVisitAtStore) {
-      return res.status(409).json(
-        createErrorResponse('本日は既にこの店舗にチェックインしています')
-      );
-    }
-
-    // Create visit record
-    const visit = await db.createVisit({
-      user_id: user.id,
-      store_id: storeId,
-      check_in_at: getCurrentTimestamp(),
-    });
-
-    // Send check-in notification (non-blocking)
-    lineService.sendCheckinNotification(lineUserId, store.name)
-      .catch(error => {
-        console.warn('Failed to send check-in notification:', error);
+      // Check for duplicate check-in within last hour
+      const recentVisits = await db.getVisitsByUserId(user.id, 1);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      
+      const recentVisit = recentVisits.find((visit: Visit) => {
+        const visitTime = new Date(visit.check_in_at);
+        return visit.store_id === storeId && visitTime > oneHourAgo;
       });
 
-    res.status(201).json(
-      createSuccessResponse(
-        { visitId: visit.id },
-        `${store.name}へのチェックインが完了しました`
-      )
-    );
+      if (recentVisit) {
+        res.status(409).json(createErrorResponse('同じ店舗への1時間以内の重複チェックインはできません'));
+        return;
+      }
 
-  } catch (error) {
-    console.error('Check-in error:', error);
+      // Create visit record
+      const visit = await db.createVisit({
+        user_id: user.id,
+        store_id: storeId,
+        check_in_at: getCurrentTimestamp(),
+      });
 
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
+      res.status(201).json(
+        createSuccessResponse(
+          {
+            visitId: visit.id,
+            storeName: store.name,
+            checkInTime: visit.check_in_at,
+          },
+          `${store.name}にチェックインしました`
+        )
       );
-    }
 
-    res.status(500).json(
-      createErrorResponse('チェックイン処理中にエラーが発生しました')
-    );
-  }
-});
+    } catch (error) {
+      console.error('Check-in error:', error);
+
+      if (error instanceof AppError) {
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
+      }
+
+      res.status(500).json(createErrorResponse('チェックイン中にエラーが発生しました'));
+    }
+  })
+);
 
 /**
  * POST /api/submit-visit-survey
- * Submit visit survey data
+ * Submit survey data for a visit
  */
-router.post('/submit-visit-survey', async (req: Request, res: Response) => {
-  try {
-    const { 
-      visitId, 
-      visitType, 
-      visitPurpose, 
-      companionIndustries, 
-      companionJobTypes 
-    }: SubmitVisitSurveyRequest = req.body;
+router.post('/submit-visit-survey', 
+  rateLimitMiddleware,
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { 
+        visitId, 
+        visitType, 
+        visitPurpose, 
+        companionIndustries, 
+        companionJobTypes 
+      }: SubmitVisitSurveyRequest = req.body;
 
-    if (!visitId || !visitType || !visitPurpose) {
-      return res.status(400).json(
-        createErrorResponse('必須項目が不足しています')
+      if (!visitId || !visitType || !visitPurpose) {
+        res.status(400).json(createErrorResponse('必須項目が不足しています'));
+        return;
+      }
+
+      // Verify visit exists
+      const existingVisit = await db.getVisitById(visitId);
+      if (!existingVisit) {
+        res.status(404).json(createErrorResponse('来店記録が見つかりません'));
+        return;
+      }
+
+      // Update visit with survey data
+      const updatedVisit = await db.updateVisit(visitId, {
+        visit_type: visitType === '１人です' ? 'single' : 'group',
+        visit_purpose: visitPurpose,
+        companion_industries: visitType === '１人です' ? [] : companionIndustries,
+        companion_job_types: visitType === '１人です' ? [] : companionJobTypes,
+      });
+
+      res.json(
+        createSuccessResponse(
+          { visitId: updatedVisit.id },
+          'アンケートの送信が完了しました'
+        )
       );
+
+    } catch (error) {
+      console.error('Visit survey submission error:', error);
+
+      if (error instanceof AppError) {
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
+      }
+
+      res.status(500).json(createErrorResponse('アンケート送信中にエラーが発生しました'));
     }
-
-    // Verify visit exists
-    const visit = await db.getVisitById(visitId);
-    if (!visit) {
-      return res.status(404).json(
-        createErrorResponse('指定された来店記録が見つかりません')
-      );
-    }
-
-    // Update visit with survey data
-    const updatedVisit = await db.updateVisit(visitId, {
-      visit_type: visitType === '１人です' ? 'single' : 'group',
-      visit_purpose: visitPurpose,
-      companion_industries: visitType === '１人です' ? [] : companionIndustries,
-      companion_job_types: visitType === '１人です' ? [] : companionJobTypes,
-    });
-
-    res.json(
-      createSuccessResponse(
-        { visitId: updatedVisit.id },
-        'アンケートの送信が完了しました'
-      )
-    );
-
-  } catch (error) {
-    console.error('Visit survey submission error:', error);
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
-      );
-    }
-
-    res.status(500).json(
-      createErrorResponse('アンケート送信中にエラーが発生しました')
-    );
-  }
-});
+  })
+);
 
 /**
  * GET /api/membership-card
  * Get membership card data for a user
  */
-router.get('/membership-card', async (req: Request, res: Response) => {
-  try {
-    const { lineUserId } = req.query;
-
-    if (!lineUserId || typeof lineUserId !== 'string') {
-      return res.status(400).json(
-        createErrorResponse('LINE IDが必要です')
-      );
-    }
-
-    // Get membership card data
-    const cardData = await db.getMembershipCardData(lineUserId);
-    if (!cardData) {
-      return res.status(404).json(
-        createErrorResponse('会員証データが見つかりません。アカウント連携を完了してください。')
-      );
-    }
-
-    // Get LINE profile for updated avatar/name
+router.get('/membership-card', 
+  rateLimitMiddleware,
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     try {
-      const lineProfile = await lineService.getUserProfile(lineUserId);
-      cardData.profile = {
-        name: lineProfile.displayName,
-        avatarUrl: lineProfile.pictureUrl || cardData.profile.avatarUrl,
-      };
+      const { lineUserId } = req.query;
+
+      if (!lineUserId || typeof lineUserId !== 'string') {
+        res.status(400).json(createErrorResponse('LINE IDが必要です'));
+        return;
+      }
+
+      // Get membership card data
+      const cardData = await db.getMembershipCardData(lineUserId);
+      if (!cardData) {
+        res.status(404).json(createErrorResponse('会員証データが見つかりません。アカウント連携を完了してください。'));
+        return;
+      }
+
+      // Get LINE profile for updated avatar/name
+      try {
+        const lineProfile = await lineService.getUserProfile(lineUserId);
+        cardData.profile = {
+          name: lineProfile.displayName,
+          avatarUrl: lineProfile.pictureUrl || cardData.profile.avatarUrl,
+        };
+      } catch (error) {
+        console.warn('Failed to get LINE profile:', error);
+        // Use existing profile data
+      }
+
+      res.json(createSuccessResponse(cardData, '会員証データを取得しました'));
+
     } catch (error) {
-      console.warn('Failed to get LINE profile:', error);
-      // Use existing profile data
+      console.error('Membership card data error:', error);
+
+      if (error instanceof AppError) {
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
+      }
+
+      res.status(500).json(createErrorResponse('会員証データの取得中にエラーが発生しました'));
     }
-
-    res.json(
-      createSuccessResponse(cardData, '会員証データを取得しました')
-    );
-
-  } catch (error) {
-    console.error('Membership card data error:', error);
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
-      );
-    }
-
-    res.status(500).json(
-      createErrorResponse('会員証データの取得中にエラーが発生しました')
-    );
-  }
-});
+  })
+);
 
 /**
  * GET /api/visit-history
  * Get visit history for a user
  */
-router.get('/visit-history', async (req: Request, res: Response) => {
-  try {
-    const { lineUserId, page = '1', limit = '50' } = req.query;
-
-    if (!lineUserId || typeof lineUserId !== 'string') {
-      return res.status(400).json(
-        createErrorResponse('LINE IDが必要です')
-      );
-    }
-
-    // Get user by LINE ID
-    const user = await db.getUserByLineId(lineUserId);
-    if (!user) {
-      return res.status(404).json(
-        createErrorResponse('ユーザーが見つかりません。アカウント連携を完了してください。')
-      );
-    }
-
-    // Parse pagination parameters
-    const pageNum = Math.max(1, parseInt(page as string, 10));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10)));
-    const offset = (pageNum - 1) * limitNum;
-
-    // Get visit history
-    const visits = await db.getVisitsByUserId(user.id, {
-      limit: limitNum,
-      offset,
-    });
-
-    // Transform data for frontend
-    const visitHistory = visits.map(visit => ({
-      id: visit.id,
-      storeName: (visit as any).stores?.name || 'Unknown Store',
-      checkInAt: visit.check_in_at,
-      visitPurpose: visit.visit_purpose,
-      visitType: visit.visit_type,
-    }));
-
-    res.json(
-      createSuccessResponse(visitHistory, '来店履歴を取得しました')
-    );
-
-  } catch (error) {
-    console.error('Visit history error:', error);
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
-      );
-    }
-
-    res.status(500).json(
-      createErrorResponse('来店履歴の取得中にエラーが発生しました')
-    );
-  }
-});
-
-/**
- * GET /api/user/profile
- * Get user profile information
- */
-router.get('/user/profile', async (req: Request, res: Response) => {
-  try {
-    const { lineUserId } = req.query;
-
-    if (!lineUserId || typeof lineUserId !== 'string') {
-      return res.status(400).json(
-        createErrorResponse('LINE IDが必要です')
-      );
-    }
-
-    // Get user by LINE ID
-    const user = await db.getUserByLineId(lineUserId);
-    if (!user) {
-      return res.status(404).json(
-        createErrorResponse('ユーザーが見つかりません')
-      );
-    }
-
-    // Get user profile
-    const userProfile = await db.getUserProfile(user.id);
-    
-    // Get survey data
-    const survey = await db.getSurveyByUserId(user.id);
-
-    // Get LINE profile
-    let lineProfile = null;
+router.get('/visit-history', 
+  rateLimitMiddleware,
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     try {
-      lineProfile = await lineService.getUserProfile(lineUserId);
+      const { lineUserId } = req.query;
+
+      if (!lineUserId || typeof lineUserId !== 'string') {
+        res.status(400).json(createErrorResponse('LINE IDが必要です'));
+        return;
+      }
+
+      // Get user by LINE ID
+      const user = await db.getUserByLineId(lineUserId);
+      if (!user) {
+        res.status(404).json(createErrorResponse('ユーザーが見つかりません。アカウント連携を完了してください。'));
+        return;
+      }
+
+      // Get visit history
+      const visits = await db.getVisitsByUserId(user.id);
+
+      // Format visits for response
+      const formattedVisits = visits.map((visit: Visit) => ({
+        id: visit.id,
+        storeName: (visit as any).stores?.name || '不明な店舗',
+        checkInAt: visit.check_in_at,
+        visitType: visit.visit_type,
+        visitPurpose: visit.visit_purpose,
+        companionIndustries: visit.companion_industries || [],
+        companionJobTypes: visit.companion_job_types || [],
+      }));
+
+      res.json(createSuccessResponse(
+        { visits: formattedVisits },
+        '来店履歴を取得しました'
+      ));
+
     } catch (error) {
-      console.warn('Failed to get LINE profile:', error);
+      console.error('Visit history error:', error);
+
+      if (error instanceof AppError) {
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
+      }
+
+      res.status(500).json(createErrorResponse('来店履歴の取得中にエラーが発生しました'));
     }
-
-    const profileData = {
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        gender: user.gender,
-        birthDate: user.birth_date,
-        createdAt: user.created_at,
-      },
-      profile: userProfile,
-      survey,
-      lineProfile,
-    };
-
-    res.json(
-      createSuccessResponse(profileData, 'プロフィール情報を取得しました')
-    );
-
-  } catch (error) {
-    console.error('User profile error:', error);
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
-      );
-    }
-
-    res.status(500).json(
-      createErrorResponse('プロフィール情報の取得中にエラーが発生しました')
-    );
-  }
-});
-
-/**
- * PUT /api/user/profile
- * Update user profile information
- */
-router.put('/user/profile', async (req: Request, res: Response) => {
-  try {
-    const { lineUserId, updates } = req.body;
-
-    if (!lineUserId) {
-      return res.status(400).json(
-        createErrorResponse('LINE IDが必要です')
-      );
-    }
-
-    // Get user by LINE ID
-    const user = await db.getUserByLineId(lineUserId);
-    if (!user) {
-      return res.status(404).json(
-        createErrorResponse('ユーザーが見つかりません')
-      );
-    }
-
-    // Update user information
-    const updatedUser = await db.updateUser(user.id, {
-      phone: updates.phone,
-      gender: updates.gender,
-    });
-
-    res.json(
-      createSuccessResponse(
-        { userId: updatedUser.id },
-        'プロフィール情報を更新しました'
-      )
-    );
-
-  } catch (error) {
-    console.error('User profile update error:', error);
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
-      );
-    }
-
-    res.status(500).json(
-      createErrorResponse('プロフィール更新中にエラーが発生しました')
-    );
-  }
-});
+  })
+);
 
 /**
  * GET /api/stores
- * Get all available stores
+ * Get list of available stores
  */
-router.get('/stores', async (req: Request, res: Response) => {
-  try {
-    const stores = await db.getAllStores();
+router.get('/stores', 
+  rateLimitMiddleware,
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    try {
+      const stores = await db.getStores();
 
-    res.json(
-      createSuccessResponse(stores, '店舗一覧を取得しました')
-    );
+      res.json(createSuccessResponse(
+        { stores },
+        '店舗一覧を取得しました'
+      ));
 
-  } catch (error) {
-    console.error('Stores retrieval error:', error);
+    } catch (error) {
+      console.error('Stores list error:', error);
 
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
-      );
+      if (error instanceof AppError) {
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
+      }
+
+      res.status(500).json(createErrorResponse('店舗一覧の取得中にエラーが発生しました'));
     }
-
-    res.status(500).json(
-      createErrorResponse('店舗一覧の取得中にエラーが発生しました')
-    );
-  }
-});
+  })
+);
 
 /**
- * GET /api/stores/:storeId
- * Get specific store information
+ * POST /api/validate-qr
+ * Validate QR code data
  */
-router.get('/stores/:storeId', async (req: Request, res: Response) => {
-  try {
-    const { storeId } = req.params;
+router.post('/validate-qr', 
+  rateLimitMiddleware,
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { qrData } = req.body;
 
-    if (!storeId) {
-      return res.status(400).json(
-        createErrorResponse('店舗IDが必要です')
-      );
+      if (!qrData) {
+        res.status(400).json(createErrorResponse('QRコードデータが必要です'));
+        return;
+      }
+
+      // Parse and validate QR data
+      const parsedData = parseQRData(qrData);
+      const isValid = validateQRData(parsedData);
+
+      if (!isValid || !parsedData) {
+        res.status(400).json(createErrorResponse('無効なQRコードです'));
+        return;
+      }
+
+      // Verify store exists
+      const store = await db.getStoreById(parsedData.store_id);
+      if (!store) {
+        res.status(404).json(createErrorResponse('店舗が見つかりません'));
+        return;
+      }
+
+      res.json(createSuccessResponse(
+        {
+          storeId: parsedData.store_id,
+          storeName: store.name,
+          storeAddress: store.address,
+          isValid: true,
+        },
+        'QRコードが有効です'
+      ));
+
+    } catch (error) {
+      console.error('QR validation error:', error);
+
+      res.status(500).json(createErrorResponse('QRコードの検証中にエラーが発生しました'));
     }
-
-    const store = await db.getStoreById(storeId);
-    if (!store) {
-      return res.status(404).json(
-        createErrorResponse('指定された店舗が見つかりません')
-      );
-    }
-
-    res.json(
-      createSuccessResponse(store, '店舗情報を取得しました')
-    );
-
-  } catch (error) {
-    console.error('Store retrieval error:', error);
-
-    if (error instanceof AppError) {
-      return res.status(error.statusCode).json(
-        createErrorResponse(error.message)
-      );
-    }
-
-    res.status(500).json(
-      createErrorResponse('店舗情報の取得中にエラーが発生しました')
-    );
-  }
-});
+  })
+);
 
 export default router;

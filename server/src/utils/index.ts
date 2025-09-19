@@ -99,9 +99,59 @@ export const generateSecureToken = (length: number = 32): string => {
 };
 
 export const hashPassword = (password: string, salt?: string): string => {
+  if (!password) {
+    throw new Error('Password is required');
+  }
   const actualSalt = salt || crypto.randomBytes(16).toString('hex');
   const hash = crypto.pbkdf2Sync(password, actualSalt, 10000, 64, 'sha512');
   return `${actualSalt}:${hash.toString('hex')}`;
+};
+
+// Add missing utility functions
+export const parseQRCodeData = parseQRData; // Alias for compatibility
+export const getCurrentTimestamp = (): string => {
+  return new Date().toISOString();
+};
+
+export const validateRegistrationData = (data: any): ValidationResult => {
+  const errors: ValidationError[] = [];
+  const requiredFields = ['email', 'birthDate', 'industry', 'jobType', 'experienceYears'];
+  
+  requiredFields.forEach(field => {
+    if (!data[field]) {
+      errors.push({ field, message: `${field}は必須です` });
+    }
+  });
+  
+  if (data.email) {
+    const emailValidation = validateEmail(data.email);
+    errors.push(...emailValidation.errors);
+  }
+  
+  if (data.birthDate) {
+    const birthDateValidation = validateBirthDate(data.birthDate);
+    errors.push(...birthDateValidation.errors);
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
+
+export const parseLineIdToken = (idToken: string): any => {
+  try {
+    // This is a simplified version - in production, you should verify the token properly
+    const parts = idToken.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+    
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    return payload;
+  } catch {
+    return null;
+  }
 };
 
 export const verifyPassword = (password: string, hashedPassword: string): boolean => {

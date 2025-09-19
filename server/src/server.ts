@@ -1,88 +1,52 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { config, corsOptions, isDevelopment, isProduction } from './config';
-
-// Middleware imports
+import { config } from './config';
 import {
-  errorHandler,
+  securityMiddleware,
+  rateLimitMiddleware,
+  corsOptions,
   requestLogger,
-  rateLimiter,
-  apiRateLimiter,
-  corsPreflightHandler,
+  errorHandler,
   healthCheck,
-  securityHeaders,
-  jsonErrorHandler,
-  requestTimeout,
-  developmentMiddleware,
+  asyncWrapper
 } from './middleware';
 
-// Route imports
+// Import routes
 import authRoutes from './routes/auth';
 import paymentRoutes from './routes/payment';
 import userRoutes from './routes/user';
 
 const app = express();
 
-// Trust proxy (important for rate limiting and getting real IPs)
+// Trust proxy for accurate IP addresses
 app.set('trust proxy', 1);
 
-// Security middleware
+// Basic middleware
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable CSP for LIFF compatibility
-  crossOriginEmbedderPolicy: false, // Disable COEP for LIFF compatibility
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.line.me", "https://api.stripe.com"],
+    },
+  },
 }));
 
-// CORS configuration
 app.use(cors(corsOptions));
-app.use(corsPreflightHandler);
-
-// Security headers
-app.use(securityHeaders);
-
-// Request timeout (30 seconds)
-app.use(requestTimeout(30000));
+app.use(requestLogger);
+app.use(rateLimitMiddleware);
 
 // Body parsing middleware
-app.use(express.json({ 
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    // Store raw body for webhook signature verification
-    if (req.path === '/api/webhook/stripe') {
-      (req as any).rawBody = buf;
-    }
-  }
-}));
+app.use('/api/webhook/stripe', express.raw({ type: 'application/json' }));
+app.use('/api/webhook/line', express.raw({ type: 'application/json' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// JSON parsing error handler
-app.use(jsonErrorHandler);
-
-// Development middleware
-if (isDevelopment) {
-  app.use(developmentMiddleware);
-}
-
-// Request logging
-app.use(requestLogger);
-
-// Health check (before rate limiting)
-app.use(healthCheck);
-
-// Rate limiting
-app.use(rateLimiter);
-app.use('/api/', apiRateLimiter);
-
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: 'YOAKE Server is running!',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    environment: config.server.nodeEnv,
-    status: 'healthy',
-  });
-});
+// Health check endpoint
+app.get('/health', healthCheck);
 
 // API routes
 app.use('/api', authRoutes);
@@ -100,20 +64,23 @@ app.get('/api/test', (req, res) => {
 });
 
 // LINE webhook endpoint (special handling for raw body)
-app.post('/api/webhook/line', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/api/webhook/line', asyncWrapper(async (req: express.Request, res: express.Response) => {
   try {
     const signature = req.headers['x-line-signature'] as string;
     
     if (!signature) {
-      return res.status(400).json({ error: 'Missing signature' });
+      res.status(400).json({ error: 'Missing signature' });
+      return;
     }
 
     // Validate signature
     const body = req.body.toString();
-    const isValid = require('./services/line').lineService.validateSignature(body, signature);
+    const { lineService } = await import('./services/line');
+    const isValid = lineService.validateSignature(body, signature);
     
     if (!isValid) {
-      return res.status(401).json({ error: 'Invalid signature' });
+      res.status(401).json({ error: 'Invalid signature' });
+      return;
     }
 
     // Parse events
@@ -121,7 +88,7 @@ app.post('/api/webhook/line', express.raw({ type: 'application/json' }), async (
     
     // Process each event
     for (const event of events) {
-      await require('./services/line').lineService.handleWebhookEvent(event);
+      await lineService.handleWebhookEvent(event);
     }
 
     res.json({ status: 'ok' });
@@ -129,7 +96,7 @@ app.post('/api/webhook/line', express.raw({ type: 'application/json' }), async (
     console.error('LINE webhook error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
   }
-});
+}));
 
 // 404 handler for unknown routes
 app.use('*', (req, res) => {
@@ -149,8 +116,6 @@ const gracefulShutdown = (signal: string) => {
   
   server.close(() => {
     console.log('HTTP server closed');
-    
-    // Close database connections, cleanup, etc.
     process.exit(0);
   });
 
@@ -180,19 +145,9 @@ process.on('unhandledRejection', (reason, promise) => {
 // Start server
 const server = app.listen(config.server.port, () => {
   console.log('🚀 YOAKE Server started successfully!');
-  console.log(`📍 Port: ${config.server.port}`);
+  console.log(`📡 Server listening on port ${config.server.port}`);
   console.log(`🌍 Environment: ${config.server.nodeEnv}`);
-  console.log(`⏰ Started at: ${new Date().toISOString()}`);
-  
-  if (isDevelopment) {
-    console.log(`🔗 Local URL: http://localhost:${config.server.port}`);
-    console.log(`🔗 API URL: http://localhost:${config.server.port}/api`);
-    console.log(`💡 Health Check: http://localhost:${config.server.port}/health`);
-  }
-  
-  if (isProduction) {
-    console.log('🔒 Production mode - Security enhanced');
-  }
+  console.log(`📊 Health check available at: /health`);
 });
 
 export default app;

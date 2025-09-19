@@ -11,7 +11,7 @@ class StripeService {
     }
 
     this.stripe = new Stripe(stripeConfig.secretKey, {
-      apiVersion: '2024-12-18.acacia', // Updated to latest supported version
+      apiVersion: '2023-10-16', // Use supported version
       typescript: true,
     });
   }

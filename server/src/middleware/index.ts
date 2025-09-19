@@ -231,7 +231,8 @@ export const validateRequest = (schema: any) => {
     
     if (error) {
       const errorMessage = error.details.map((detail: any) => detail.message).join(', ');
-      return res.status(400).json(createErrorResponse(errorMessage));
+      res.status(400).json(createErrorResponse(errorMessage));
+      return;
     }
     
     req.body = value;
@@ -245,7 +246,8 @@ export const validateContentType = (allowedTypes: string[]) => {
     const contentType = req.headers['content-type'];
     
     if (!contentType || !allowedTypes.some(type => contentType.includes(type))) {
-      return res.status(400).json(createErrorResponse('無効なContent-Type'));
+      res.status(400).json(createErrorResponse('無効なContent-Type'));
+      return;
     }
     
     next();
@@ -259,19 +261,21 @@ export const validateLineSignature = (req: Request, res: Response, next: NextFun
     const body = req.body;
     
     if (!signature) {
-      return res.status(400).json(createErrorResponse('署名が必要です'));
+      res.status(400).json(createErrorResponse('署名が必要です'));
+      return;
     }
     
     const isValid = lineService.validateSignature(body.toString(), signature);
     
     if (!isValid) {
-      return res.status(401).json(createErrorResponse('無効な署名です'));
+      res.status(401).json(createErrorResponse('無効な署名です'));
+      return;
     }
     
     next();
   } catch (error) {
     logError(error as Error, 'validateLineSignature');
-    return res.status(400).json(createErrorResponse('署名の検証に失敗しました'));
+    res.status(400).json(createErrorResponse('署名の検証に失敗しました'));
   }
 };
 
