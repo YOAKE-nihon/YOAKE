@@ -102,6 +102,9 @@ export interface RegisterFormData {
   servicePriority: string;
 }
 
+// Alias for compatibility
+export interface SurveyData extends RegisterFormData {}
+
 export interface CheckInFormData {
   visitType: string;
   visitPurpose: string;
@@ -141,8 +144,56 @@ export const VISIT_PURPOSE_OPTIONS = [
   '休憩・リラックス', 'その他'
 ] as const;
 
+// Survey-related constants
+export const SIDE_JOB_INTEREST_OPTIONS = [
+  'とても興味がある', '少し興味がある', 'あまり興味がない', '全く興味がない'
+] as const;
+
+export const SIDE_JOB_TIME_OPTIONS = [
+  '平日夜', '土日祝日', '平日昼間', 'いつでも', '時間が取れない'
+] as const;
+
+export const SIDE_JOB_FIELDS_OPTIONS = [
+  'Webデザイン・制作', 'プログラミング', 'ライティング', 'マーケティング',
+  'コンサルティング', '教育・研修', '翻訳・通訳', 'データ分析',
+  '写真・動画制作', 'その他'
+] as const;
+
+export const SIDE_JOB_PURPOSE_OPTIONS = [
+  '収入を増やしたい', 'スキルアップしたい', '人脈を広げたい', 
+  '新しいことに挑戦したい', '将来の独立準備', 'その他'
+] as const;
+
+export const SIDE_JOB_CHALLENGE_OPTIONS = [
+  '時間がない', 'スキル不足', '案件の見つけ方がわからない',
+  '価格設定がわからない', '継続的な案件獲得', 'その他'
+] as const;
+
+export const MEET_PEOPLE_OPTIONS = [
+  '同業界の人', '異業界の人', '起業家・経営者', 'フリーランス',
+  '学生', '投資家', 'クリエイター', 'その他'
+] as const;
+
+export const SERVICE_BENEFIT_OPTIONS = [
+  'ネットワーキング', '作業環境', '学習機会', 'イベント参加',
+  'メンタリング', 'ビジネスマッチング', '情報交換', 'その他'
+] as const;
+
+export const SERVICE_PRIORITY_OPTIONS = [
+  '立地・アクセス', '料金', 'コミュニティ', '設備・環境',
+  'イベント・勉強会', 'サポート体制', '営業時間', 'その他'
+] as const;
+
 export type Gender = typeof GENDER_OPTIONS[number];
 export type ExperienceYears = typeof EXPERIENCE_YEARS_OPTIONS[number];
 export type Industry = typeof INDUSTRY_OPTIONS[number];
 export type JobType = typeof JOB_TYPE_OPTIONS[number];
 export type VisitPurpose = typeof VISIT_PURPOSE_OPTIONS[number];
+export type SideJobInterest = typeof SIDE_JOB_INTEREST_OPTIONS[number];
+export type SideJobTime = typeof SIDE_JOB_TIME_OPTIONS[number];
+export type SideJobField = typeof SIDE_JOB_FIELDS_OPTIONS[number];
+export type SideJobPurpose = typeof SIDE_JOB_PURPOSE_OPTIONS[number];
+export type SideJobChallenge = typeof SIDE_JOB_CHALLENGE_OPTIONS[number];
+export type MeetPeople = typeof MEET_PEOPLE_OPTIONS[number];
+export type ServiceBenefit = typeof SERVICE_BENEFIT_OPTIONS[number];
+export type ServicePriority = typeof SERVICE_PRIORITY_OPTIONS[number];
