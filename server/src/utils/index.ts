@@ -107,6 +107,25 @@ export const hashPassword = (password: string, salt?: string): string => {
   return `${actualSalt}:${hash.toString('hex')}`;
 };
 
+// QR code utilities
+export const parseQRData = (qrData: string): any => {
+  try {
+    return JSON.parse(qrData);
+  } catch {
+    return null;
+  }
+};
+
+export const validateQRData = (qrData: any): boolean => {
+  return (
+    qrData &&
+    typeof qrData === 'object' &&
+    qrData.app === 'yoake' &&
+    qrData.type === 'check-in' &&
+    qrData.store_id
+  );
+};
+
 // Add missing utility functions
 export const parseQRCodeData = parseQRData; // Alias for compatibility
 export const getCurrentTimestamp = (): string => {
@@ -141,14 +160,18 @@ export const validateRegistrationData = (data: any): ValidationResult => {
 
 export const parseLineIdToken = (idToken: string): any => {
   try {
+    if (!idToken || typeof idToken !== 'string') {
+      return null;
+    }
+    
     // This is a simplified version - in production, you should verify the token properly
     const parts = idToken.split('.');
     if (parts.length !== 3) {
       return null;
     }
     
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-    return payload;
+    const payload = Buffer.from(parts[1], 'base64url').toString();
+    return JSON.parse(payload);
   } catch {
     return null;
   }
