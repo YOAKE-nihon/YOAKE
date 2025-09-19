@@ -107,78 +107,15 @@ export const hashPassword = (password: string, salt?: string): string => {
   return `${actualSalt}:${hash.toString('hex')}`;
 };
 
-// QR code utilities
-export const parseQRData = (qrData: string): any => {
-  try {
-    return JSON.parse(qrData);
-  } catch {
-    return null;
-  }
-};
-
-export const validateQRData = (qrData: any): boolean => {
-  return (
-    qrData &&
-    typeof qrData === 'object' &&
-    qrData.app === 'yoake' &&
-    qrData.type === 'check-in' &&
-    qrData.store_id
-  );
-};
-
-// Add missing utility functions
-export const parseQRCodeData = parseQRData; // Alias for compatibility
-export const getCurrentTimestamp = (): string => {
-  return new Date().toISOString();
-};
-
-export const validateRegistrationData = (data: any): ValidationResult => {
-  const errors: ValidationError[] = [];
-  const requiredFields = ['email', 'birthDate', 'industry', 'jobType', 'experienceYears'];
-  
-  requiredFields.forEach(field => {
-    if (!data[field]) {
-      errors.push({ field, message: `${field}は必須です` });
-    }
-  });
-  
-  if (data.email) {
-    const emailValidation = validateEmail(data.email);
-    errors.push(...emailValidation.errors);
-  }
-  
-  if (data.birthDate) {
-    const birthDateValidation = validateBirthDate(data.birthDate);
-    errors.push(...birthDateValidation.errors);
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
-};
-
-export const parseLineIdToken = (idToken: string): any => {
-  try {
-    if (!idToken || typeof idToken !== 'string') {
-      return null;
-    }
-    
-    // This is a simplified version - in production, you should verify the token properly
-    const parts = idToken.split('.');
-    if (parts.length !== 3) {
-      return null;
-    }
-    
-    const payload = Buffer.from(parts[1], 'base64url').toString();
-    return JSON.parse(payload);
-  } catch {
-    return null;
-  }
-};
-
 export const verifyPassword = (password: string, hashedPassword: string): boolean => {
-  const [salt, hash] = hashedPassword.split(':');
+  if (!password || !hashedPassword) {
+    return false;
+  }
+  const parts = hashedPassword.split(':');
+  if (parts.length !== 2) {
+    return false;
+  }
+  const [salt, hash] = parts;
   const verifyHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512');
   return hash === verifyHash.toString('hex');
 };
@@ -273,4 +210,56 @@ export const validateQRData = (qrData: any): boolean => {
     qrData.type === 'check-in' &&
     qrData.store_id
   );
+};
+
+// Utility functions for compatibility
+export const parseQRCodeData = parseQRData; // Alias for compatibility
+
+export const getCurrentTimestamp = (): string => {
+  return new Date().toISOString();
+};
+
+export const validateRegistrationData = (data: any): ValidationResult => {
+  const errors: ValidationError[] = [];
+  const requiredFields = ['email', 'birthDate', 'industry', 'jobType', 'experienceYears'];
+  
+  requiredFields.forEach(field => {
+    if (!data[field]) {
+      errors.push({ field, message: `${field}は必須です` });
+    }
+  });
+  
+  if (data.email) {
+    const emailValidation = validateEmail(data.email);
+    errors.push(...emailValidation.errors);
+  }
+  
+  if (data.birthDate) {
+    const birthDateValidation = validateBirthDate(data.birthDate);
+    errors.push(...birthDateValidation.errors);
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
+
+export const parseLineIdToken = (idToken: string): any => {
+  try {
+    if (!idToken || typeof idToken !== 'string') {
+      return null;
+    }
+    
+    // This is a simplified version - in production, you should verify the token properly
+    const parts = idToken.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+    
+    const payload = Buffer.from(parts[1], 'base64url').toString();
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
 };
