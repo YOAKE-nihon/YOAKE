@@ -82,6 +82,7 @@ router.post('/create-payment-intent',
         },
         '決済準備が完了しました'
       ));
+
     } catch (error) {
       console.error('Payment intent creation error:', error);
 
@@ -101,17 +102,15 @@ router.post('/create-payment-intent',
  */
 router.post('/create-subscription', 
   rateLimitMiddleware,
-  asyncWrapper(async (req: Request, res: Response) => {
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     try {
       const { customerId, priceId } = req.body;
 
       if (!customerId || !priceId) {
-        return res.status(400).json(
-          createErrorResponse('顧客IDと価格IDが必要です')
-        );
+        res.status(400).json(createErrorResponse('顧客IDと価格IDが必要です'));
+        return;
       }
 
-      // Create subscription
       const subscription = await stripeService.createSubscription({
         customerId,
         priceId,
@@ -120,38 +119,33 @@ router.post('/create-subscription',
         },
       });
 
-      // Get client secret from the subscription's latest invoice
       let clientSecret = null;
       if (subscription.latest_invoice) {
-        const invoice = subscription.latest_invoice as Stripe.Invoice;
-        if (invoice.payment_intent) {
-          const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
+        if (typeof subscription.latest_invoice === 'object' && 
+            'payment_intent' in subscription.latest_invoice && 
+            subscription.latest_invoice.payment_intent) {
+          const paymentIntent = subscription.latest_invoice.payment_intent as Stripe.PaymentIntent;
           clientSecret = paymentIntent.client_secret;
         }
       }
 
-      res.json(
-        createSuccessResponse(
-          {
-            subscriptionId: subscription.id,
-            clientSecret,
-          },
-          'サブスクリプションが作成されました'
-        )
-      );
+      res.json(createSuccessResponse(
+        {
+          subscriptionId: subscription.id,
+          clientSecret,
+        },
+        'サブスクリプションが作成されました'
+      ));
 
     } catch (error) {
       console.error('Subscription creation error:', error);
 
       if (error instanceof AppError) {
-        return res.status(error.statusCode).json(
-          createErrorResponse(error.message)
-        );
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
       }
 
-      res.status(500).json(
-        createErrorResponse('サブスクリプション作成中にエラーが発生しました')
-      );
+      res.status(500).json(createErrorResponse('サブスクリプション作成中にエラーが発生しました'));
     }
   })
 );
@@ -162,46 +156,37 @@ router.post('/create-subscription',
  */
 router.get('/payment-methods/:customerId', 
   rateLimitMiddleware,
-  asyncWrapper(async (req: Request, res: Response) => {
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     try {
       const { customerId } = req.params;
 
       if (!customerId) {
-        return res.status(400).json(
-          createErrorResponse('顧客IDが必要です')
-        );
+        res.status(400).json(createErrorResponse('顧客IDが必要です'));
+        return;
       }
 
-      // Verify customer exists
       const customer = await stripeService.getCustomer(customerId);
       if (!customer) {
-        return res.status(404).json(
-          createErrorResponse('顧客が見つかりません')
-        );
+        res.status(404).json(createErrorResponse('顧客が見つかりません'));
+        return;
       }
 
-      // Get payment methods
       const paymentMethods = await stripeService.getPaymentMethods(customerId);
 
-      res.json(
-        createSuccessResponse(
-          { paymentMethods },
-          '支払い方法を取得しました'
-        )
-      );
+      res.json(createSuccessResponse(
+        { paymentMethods },
+        '支払い方法を取得しました'
+      ));
 
     } catch (error) {
       console.error('Payment methods retrieval error:', error);
 
       if (error instanceof AppError) {
-        return res.status(error.statusCode).json(
-          createErrorResponse(error.message)
-        );
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
       }
 
-      res.status(500).json(
-        createErrorResponse('支払い方法の取得中にエラーが発生しました')
-      );
+      res.status(500).json(createErrorResponse('支払い方法の取得中にエラーが発生しました'));
     }
   })
 );
@@ -212,25 +197,22 @@ router.get('/payment-methods/:customerId',
  */
 router.post('/webhook/stripe',
   strictRateLimitMiddleware,
-  asyncWrapper(async (req: Request, res: Response) => {
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     try {
       const signature = req.headers['stripe-signature'] as string;
       const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
       if (!signature || !webhookSecret) {
-        return res.status(400).json(
-          createErrorResponse('Webhook署名が無効です')
-        );
+        res.status(400).json(createErrorResponse('Webhook署名が無効です'));
+        return;
       }
 
-      // Verify webhook signature
       const event = stripeService.validateWebhookSignature(
         req.body,
         signature,
         webhookSecret
       );
 
-      // Handle different event types
       switch (event.type) {
         case 'payment_intent.succeeded':
           const paymentIntent = event.data.object as Stripe.PaymentIntent;
@@ -260,9 +242,7 @@ router.post('/webhook/stripe',
 
     } catch (error) {
       console.error('Stripe webhook error:', error);
-      res.status(400).json(
-        createErrorResponse('Webhook処理中にエラーが発生しました')
-      );
+      res.status(400).json(createErrorResponse('Webhook処理中にエラーが発生しました'));
     }
   })
 );
@@ -272,9 +252,7 @@ async function handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent): Promis
   try {
     const userId = paymentIntent.metadata?.userId;
     if (userId) {
-      // Update user payment status or create membership record
       console.log(`Payment succeeded for user ${userId}: ${paymentIntent.id}`);
-      // Add your business logic here
     }
   } catch (error) {
     console.error('Error handling payment success:', error);
@@ -285,9 +263,7 @@ async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent): Promis
   try {
     const userId = paymentIntent.metadata?.userId;
     if (userId) {
-      // Handle payment failure
       console.log(`Payment failed for user ${userId}: ${paymentIntent.id}`);
-      // Add your business logic here (send notification, etc.)
     }
   } catch (error) {
     console.error('Error handling payment failure:', error);
@@ -297,7 +273,6 @@ async function handlePaymentFailure(paymentIntent: Stripe.PaymentIntent): Promis
 async function handleSubscriptionCreated(subscription: Stripe.Subscription): Promise<void> {
   try {
     console.log(`Subscription created: ${subscription.id}`);
-    // Add your business logic here
   } catch (error) {
     console.error('Error handling subscription creation:', error);
   }
@@ -306,7 +281,6 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription): Pro
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Promise<void> {
   try {
     console.log(`Subscription deleted: ${subscription.id}`);
-    // Add your business logic here
   } catch (error) {
     console.error('Error handling subscription deletion:', error);
   }

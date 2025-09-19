@@ -6,7 +6,7 @@ import { db } from '../services/database';
 import { lineService } from '../services/line';
 import { config } from '../config';
 import { AuthenticatedRequest, AppError } from '../types';
-import { createErrorResponse, logError } from '../utils';
+import { createErrorResponse, logError, parseLineIdToken } from '../utils';
 
 // Security middleware
 export const securityMiddleware = helmet({
@@ -74,25 +74,24 @@ export const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization', 'x-line-signature'],
 };
 
-// Authentication middleware for LINE ID token
-export const authenticateLineToken = async (
+// Authentication middleware for LINE users
+export const authenticateLineUser = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
+    const idToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!idToken) {
       res.status(401).json(createErrorResponse('認証トークンが必要です'));
       return;
     }
-    
-    const idToken = authHeader.substring(7);
-    
-    // Verify LINE ID token
-    const lineProfile = await lineService.verifyIdToken(idToken);
-    if (!lineProfile) {
+
+    // Parse LINE ID token using utility function
+    const lineProfile = parseLineIdToken(idToken);
+    if (!lineProfile || !lineProfile.sub) {
       res.status(401).json(createErrorResponse('無効な認証トークンです'));
       return;
     }
@@ -100,24 +99,26 @@ export const authenticateLineToken = async (
     // Get user from database
     const user = await db.getUserByLineId(lineProfile.sub);
     if (!user) {
-      res.status(404).json(createErrorResponse('ユーザーが見つかりません'));
+      res.status(401).json(createErrorResponse('ユーザーが見つかりません。アカウント連携を完了してください。'));
       return;
     }
-    
+
+    // Add user and LINE profile to request
     req.user = user;
     req.lineProfile = {
       userId: lineProfile.sub,
       displayName: lineProfile.name || 'Unknown User',
       pictureUrl: lineProfile.picture,
     };
+
     next();
   } catch (error) {
-    logError(error as Error, 'authenticateLineToken');
+    console.error('Authentication error:', error);
     res.status(401).json(createErrorResponse('認証に失敗しました'));
   }
 };
 
-// Optional authentication middleware
+// Optional authentication middleware (doesn't fail if no token)
 export const optionalAuthentication = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -125,17 +126,20 @@ export const optionalAuthentication = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
+    const idToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const idToken = authHeader.substring(7);
-      
+    if (idToken) {
       try {
-        const lineProfile = await lineService.verifyIdToken(idToken);
-        if (lineProfile) {
+        const lineProfile = parseLineIdToken(idToken);
+        if (lineProfile && lineProfile.sub) {
           const user = await db.getUserByLineId(lineProfile.sub);
           if (user) {
             req.user = user;
-            req.lineProfile = lineProfile;
+            req.lineProfile = {
+              userId: lineProfile.sub,
+              displayName: lineProfile.name || 'Unknown User',
+              pictureUrl: lineProfile.picture,
+            };
           }
         }
       } catch (error) {
@@ -161,7 +165,8 @@ export const authenticateAdmin = async (
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json(createErrorResponse('管理者認証が必要です'));
+      res.status(401).json(createErrorResponse('管理者認証が必要です'));
+      return;
     }
     
     const token = authHeader.substring(7);
@@ -170,14 +175,15 @@ export const authenticateAdmin = async (
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
     
     if (!decoded.isAdmin) {
-      return res.status(403).json(createErrorResponse('管理者権限が必要です'));
+      res.status(403).json(createErrorResponse('管理者権限が必要です'));
+      return;
     }
     
     req.user = decoded;
     next();
   } catch (error) {
     logError(error as Error, 'authenticateAdmin');
-    return res.status(401).json(createErrorResponse('管理者認証に失敗しました'));
+    res.status(401).json(createErrorResponse('管理者認証に失敗しました'));
   }
 };
 
@@ -206,20 +212,24 @@ export const errorHandler = (
   logError(error, 'errorHandler');
   
   if (error instanceof AppError) {
-    return res.status(error.statusCode).json(createErrorResponse(error.message));
+    res.status(error.statusCode).json(createErrorResponse(error.message));
+    return;
   }
   
   // Handle specific error types
   if (error.name === 'ValidationError') {
-    return res.status(400).json(createErrorResponse('入力データが無効です'));
+    res.status(400).json(createErrorResponse('入力データが無効です'));
+    return;
   }
   
   if (error.name === 'CastError') {
-    return res.status(400).json(createErrorResponse('無効なIDです'));
+    res.status(400).json(createErrorResponse('無効なIDです'));
+    return;
   }
   
   if (error.name === 'MongoError' && (error as any).code === 11000) {
-    return res.status(409).json(createErrorResponse('データが既に存在します'));
+    res.status(409).json(createErrorResponse('データが既に存在します'));
+    return;
   }
   
   // Default error response
