@@ -32,6 +32,11 @@ class LineService {
         return null;
       }
 
+      // Fix: Ensure parts[1] exists before using Buffer.from
+      if (!parts[1]) {
+        return null;
+      }
+
       const payload = Buffer.from(parts[1], 'base64url').toString();
       const parsed = JSON.parse(payload) as LineIdTokenPayload;
 

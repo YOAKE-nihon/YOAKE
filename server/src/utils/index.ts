@@ -116,6 +116,9 @@ export const verifyPassword = (password: string, hashedPassword: string): boolea
     return false;
   }
   const [salt, hash] = parts;
+  if (!salt || !hash) {
+    return false;
+  }
   const verifyHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512');
   return hash === verifyHash.toString('hex');
 };
@@ -252,7 +255,7 @@ export const parseLineIdToken = (idToken: string): any => {
     }
     
     const parts = idToken.split('.');
-    if (parts.length !== 3) {
+    if (parts.length !== 3 || !parts[1]) {
       return null;
     }
     

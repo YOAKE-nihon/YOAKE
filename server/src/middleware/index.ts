@@ -84,7 +84,8 @@ export const authenticateLineToken = async (
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json(createErrorResponse('認証トークンが必要です'));
+      res.status(401).json(createErrorResponse('認証トークンが必要です'));
+      return;
     }
     
     const idToken = authHeader.substring(7);
@@ -92,21 +93,27 @@ export const authenticateLineToken = async (
     // Verify LINE ID token
     const lineProfile = await lineService.verifyIdToken(idToken);
     if (!lineProfile) {
-      return res.status(401).json(createErrorResponse('無効な認証トークンです'));
+      res.status(401).json(createErrorResponse('無効な認証トークンです'));
+      return;
     }
     
     // Get user from database
     const user = await db.getUserByLineId(lineProfile.sub);
     if (!user) {
-      return res.status(404).json(createErrorResponse('ユーザーが見つかりません'));
+      res.status(404).json(createErrorResponse('ユーザーが見つかりません'));
+      return;
     }
     
     req.user = user;
-    req.lineProfile = lineProfile;
+    req.lineProfile = {
+      userId: lineProfile.sub,
+      displayName: lineProfile.name || 'Unknown User',
+      pictureUrl: lineProfile.picture,
+    };
     next();
   } catch (error) {
     logError(error as Error, 'authenticateLineToken');
-    return res.status(401).json(createErrorResponse('認証に失敗しました'));
+    res.status(401).json(createErrorResponse('認証に失敗しました'));
   }
 };
 

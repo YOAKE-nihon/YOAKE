@@ -26,35 +26,29 @@ const router = Router();
  */
 router.post('/create-payment-intent', 
   rateLimitMiddleware,
-  asyncWrapper(async (req: Request, res: Response) => {
+  asyncWrapper(async (req: Request, res: Response): Promise<void> => {
     try {
       const { amount, email, stripeCustomerId }: CreatePaymentIntentRequest = req.body;
 
-      // Validation
       if (!amount || !email) {
-        return res.status(400).json(
-          createErrorResponse('金額とメールアドレスが必要です')
-        );
+        res.status(400).json(createErrorResponse('金額とメールアドレスが必要です'));
+        return;
       }
 
       const emailValidation = validateEmail(email);
       if (!emailValidation.isValid) {
-        return res.status(400).json(
-          createErrorResponse(emailValidation.errors[0]?.message || '無効なメールアドレス')
-        );
+        res.status(400).json(createErrorResponse(emailValidation.errors[0]?.message || '無効なメールアドレス'));
+        return;
       }
 
-      // Check if user exists
       const user = await db.getUserByEmail(email);
       if (!user) {
-        return res.status(404).json(
-          createErrorResponse('ユーザーが見つかりません')
-        );
+        res.status(404).json(createErrorResponse('ユーザーが見つかりません'));
+        return;
       }
 
       let customerId = stripeCustomerId || user.stripe_customer_id;
 
-      // Create Stripe customer if doesn't exist
       if (!customerId) {
         const customer = await stripeService.createCustomer({
           email: user.email,
@@ -66,14 +60,11 @@ router.post('/create-payment-intent',
         });
 
         customerId = customer.id;
-
-        // Update user with Stripe customer ID
         await db.updateUser(user.id, { stripe_customer_id: customerId });
       }
 
-      // Create payment intent
       const paymentIntent = await stripeService.createPaymentIntent({
-        amount: Math.round(amount), // Ensure integer
+        amount: Math.round(amount),
         customerId,
         description: 'YOAKE会員費',
         metadata: {
@@ -83,29 +74,23 @@ router.post('/create-payment-intent',
         },
       });
 
-      res.json(
-        createSuccessResponse(
-          {
-            clientSecret: paymentIntent.client_secret,
-            customerId,
-            amount: paymentIntent.amount,
-          },
-          '決済準備が完了しました'
-        )
-      );
-
+      res.json(createSuccessResponse(
+        {
+          clientSecret: paymentIntent.client_secret,
+          customerId,
+          amount: paymentIntent.amount,
+        },
+        '決済準備が完了しました'
+      ));
     } catch (error) {
       console.error('Payment intent creation error:', error);
 
       if (error instanceof AppError) {
-        return res.status(error.statusCode).json(
-          createErrorResponse(error.message)
-        );
+        res.status(error.statusCode).json(createErrorResponse(error.message));
+        return;
       }
 
-      res.status(500).json(
-        createErrorResponse('決済準備中にエラーが発生しました')
-      );
+      res.status(500).json(createErrorResponse('決済準備中にエラーが発生しました'));
     }
   })
 );
