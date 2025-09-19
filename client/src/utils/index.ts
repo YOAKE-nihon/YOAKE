@@ -1,18 +1,75 @@
-import { SurveyData, FormValidation, ErrorState } from '../types';
-
-// Date utilities
-export const formatDate = (date: string | Date): string => {
-  const d = new Date(date);
-  return d.toLocaleDateString('ja-JP');
+// Chart formatting utilities
+export const formatChartData = (data: Record<string, number>) => {
+  const labels = Object.keys(data);
+  const values = Object.values(data);
+  
+  return {
+    labels,
+    datasets: [
+      {
+        data: values,
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB', 
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40',
+        ],
+        borderWidth: 2,
+        borderColor: '#fff',
+      },
+    ],
+  };
 };
 
-export const formatDateTime = (date: string | Date): string => {
-  const d = new Date(date);
-  return d.toLocaleString('ja-JP');
+// Chart options
+export const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: {
+        padding: 20,
+        font: {
+          size: 12,
+        },
+      },
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const label = context.label || '';
+          const value = context.parsed || 0;
+          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+          const percentage = ((value / total) * 100).toFixed(1);
+          return `${label}: ${value}回 (${percentage}%)`;
+        },
+      },
+    },
+  },
 };
 
-export const formatTime = (date: Date): string => {
-  return date.toLocaleTimeString('ja-JP');
+// Date formatting utilities
+export const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+export const formatDateTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 // Form validation utilities
@@ -22,264 +79,54 @@ export const validateEmail = (email: string): boolean => {
 };
 
 export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^[\d\-\(\)\+\s]+$/;
-  return phone.length >= 10 && phoneRegex.test(phone);
+  const phoneRegex = /^[0-9-+().\s]+$/;
+  return phoneRegex.test(phone) && phone.length >= 10;
 };
 
 export const validateBirthDate = (birthDate: string): boolean => {
   const date = new Date(birthDate);
   const now = new Date();
-  const minAge = new Date();
-  minAge.setFullYear(now.getFullYear() - 13); // 最低13歳
-  
-  return date < minAge && date > new Date('1900-01-01');
+  const age = now.getFullYear() - date.getFullYear();
+  return age >= 13 && age <= 100;
 };
 
-export const validateSurveyData = (data: Partial<SurveyData>): FormValidation => {
-  const errors: Record<string, string> = {};
-
-  // Required fields validation
-  if (!data.email || !validateEmail(data.email)) {
-    errors.email = '有効なメールアドレスを入力してください';
-  }
-
-  if (!data.birthDate || !validateBirthDate(data.birthDate)) {
-    errors.birthDate = '有効な生年月日を入力してください';
-  }
-
-  if (!data.industry) {
-    errors.industry = '業界を選択してください';
-  }
-
-  if (!data.jobType) {
-    errors.jobType = '職種を選択してください';
-  }
-
-  if (!data.experienceYears) {
-    errors.experienceYears = '経験年数を選択してください';
-  }
-
-  if (!data.interestInSideJob) {
-    errors.interestInSideJob = '副業への関心を選択してください';
-  }
-
-  if (!data.serviceBenefit) {
-    errors.serviceBenefit = '楽しみな特典を選択してください';
-  }
-
-  if (!data.servicePriority) {
-    errors.servicePriority = '重視することを選択してください';
-  }
-
-  // Conditional validation for side job questions
-  const showSideJobQuestions = ['high', 'medium'].includes(data.interestInSideJob || '');
-  if (showSideJobQuestions) {
-    if (!data.sideJobTime) {
-      errors.sideJobTime = '副業に割ける時間を選択してください';
-    }
-    if (!data.sideJobPurpose) {
-      errors.sideJobPurpose = '副業の目的を選択してください';
-    }
-    if (!data.sideJobChallenge) {
-      errors.sideJobChallenge = '副業への課題を選択してください';
-    }
-  }
-
-  // Phone validation (optional)
-  if (data.phone && !validatePhone(data.phone)) {
-    errors.phone = '有効な電話番号を入力してください';
-  }
-
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors
-  };
-};
-
-// LIFF utilities
-export const initializeLiff = async (liffId: string): Promise<boolean> => {
+// Storage utilities
+export const getStorageItem = (key: string): string | null => {
   try {
-    const liff = window.liff;
-    if (!liff) {
-      throw new Error('LIFF SDKが見つかりません');
-    }
-
-    await liff.init({ liffId });
-    return true;
-  } catch (error) {
-    console.error('LIFF initialization error:', error);
-    return false;
-  }
-};
-
-export const getLiffProfile = async () => {
-  try {
-    const liff = window.liff;
-    if (!liff || !liff.isLoggedIn()) {
-      throw new Error('LIFF not logged in');
-    }
-
-    return await liff.getProfile();
-  } catch (error) {
-    console.error('Get LIFF profile error:', error);
-    throw error;
-  }
-};
-
-export const getLiffIdToken = (): string | null => {
-  try {
-    const liff = window.liff;
-    if (!liff || !liff.isLoggedIn()) {
-      return null;
-    }
-
-    return liff.getIDToken();
-  } catch (error) {
-    console.error('Get LIFF ID token error:', error);
+    return localStorage.getItem(key);
+  } catch {
     return null;
   }
 };
 
-export const redirectToLiffLogin = (redirectUri?: string): void => {
+export const setStorageItem = (key: string, value: string): void => {
   try {
-    const liff = window.liff;
-    if (!liff) {
-      throw new Error('LIFF SDKが見つかりません');
-    }
-
-    liff.login({ redirectUri: redirectUri || window.location.href });
-  } catch (error) {
-    console.error('LIFF login redirect error:', error);
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage not available
   }
 };
 
-export const closeLiffWindow = (): void => {
+export const removeStorageItem = (key: string): void => {
   try {
-    const liff = window.liff;
-    if (liff && liff.isInClient()) {
-      liff.closeWindow();
-    }
-  } catch (error) {
-    console.error('Close LIFF window error:', error);
+    localStorage.removeItem(key);
+  } catch {
+    // Storage not available
   }
 };
 
-// Error handling utilities
-export const createErrorState = (message: string, field?: string): ErrorState => {
-  return { message, field };
+// API utilities
+export const createApiError = (message: string, status?: number) => {
+  const error = new Error(message) as any;
+  error.status = status;
+  return error;
 };
 
-export const formatErrorMessage = (error: any): string => {
-  if (error?.response?.data?.message) {
-    return error.response.data.message;
-  }
-  if (error?.message) {
-    return error.message;
-  }
-  return 'エラーが発生しました';
-};
-
-// Chart utilities for membership card
-export const formatChartData = (chartData: Record<string, number>, label: string) => {
-  const labels = Object.keys(chartData);
-  const data = Object.values(chartData);
-  
-  return {
-    labels,
-    datasets: [{
-      label,
-      data,
-      backgroundColor: [
-        'rgba(184, 117, 0, 0.7)',
-        'rgba(108, 117, 125, 0.7)',
-        'rgba(214, 164, 73, 0.7)',
-        'rgba(248, 249, 250, 0.7)',
-        'rgba(52, 58, 64, 0.7)',
-        'rgba(255, 193, 7, 0.7)'
-      ],
-      borderColor: [
-        '#b87500',
-        '#6c757d',
-        '#d6a449',
-        '#f8f9fa',
-        '#343a40',
-        '#ffc107'
-      ],
-      borderWidth: 1,
-    }]
-  };
-};
-
-export const chartOptions = {
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-      labels: {
-        color: '#333',
-        font: { size: 10 }
-      }
-    }
-  },
-  maintainAspectRatio: false,
-  responsive: true
-};
-
-// Local storage utilities (fallback for non-supported environments)
-export const setLocalStorage = (key: string, value: any): void => {
+// QR code utilities
+export const parseQRData = (qrData: string) => {
   try {
-    if (typeof Storage !== 'undefined') {
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-  } catch (error) {
-    console.warn('LocalStorage not available:', error);
-  }
-};
-
-export const getLocalStorage = <T>(key: string, defaultValue: T): T => {
-  try {
-    if (typeof Storage !== 'undefined') {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
-    }
-  } catch (error) {
-    console.warn('LocalStorage not available:', error);
-  }
-  return defaultValue;
-};
-
-export const removeLocalStorage = (key: string): void => {
-  try {
-    if (typeof Storage !== 'undefined') {
-      localStorage.removeItem(key);
-    }
-  } catch (error) {
-    console.warn('LocalStorage not available:', error);
-  }
-};
-
-// QR Code utilities
-export const parseQRCode = (qrValue: string): { app: string; type: string; store_id: string } | null => {
-  try {
-    const parsed = JSON.parse(qrValue);
-    if (parsed.app === 'yoake' && parsed.type === 'check-in' && parsed.store_id) {
-      return parsed;
-    }
-    return null;
-  } catch (error) {
-    console.error('QR code parse error:', error);
+    return JSON.parse(qrData);
+  } catch {
     return null;
   }
-};
-
-// Debounce utility for form inputs
-export const debounce = <T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): ((...args: Parameters<T>) => void) => {
-  let timeout: NodeJS.Timeout;
-  
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
 };

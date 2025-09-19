@@ -1,52 +1,74 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useLiff } from '../hooks';
 
 const CompletionPage: React.FC = () => {
-  // LINE公式アカウントの友だち追加URL（必要に応じて設定）
-  const lineOfficialAccountUrl = 'https://lin.ee/YOUR_LINE_OA_ID';
+  const { closeWindow } = useLiff();
+
+  useEffect(() => {
+    // 5秒後に自動的にLIFF画面を閉じる
+    const timer = setTimeout(() => {
+      if (closeWindow) {
+        closeWindow();
+      }
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [closeWindow]);
+
+  const handleClose = () => {
+    if (closeWindow) {
+      closeWindow();
+    }
+  };
 
   return (
-    <div className="form-container">
-      <h2 className="form-title">会員登録ありがとうございます！</h2>
-      <div className="completion-message">
-        <p>会員登録と決済手続きが完了いたしました。</p>
-        <p style={{ fontWeight: 'bold', margin: '20px 0' }}>
-          あなたのLINEに、アカウント連携のご案内メッセージをお送りしました。
-        </p>
-        <p>
-          LINEアプリを開き、メッセージ内の「アカウント連携に進む」ボタンをタップして、
-          最後のステップを完了してください。
-        </p>
-        <div style={{ 
-          marginTop: '30px', 
-          padding: '20px', 
-          backgroundColor: '#f8f9fa', 
-          borderRadius: '8px' 
-        }}>
-          <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>次のステップ</h4>
-          <ol style={{ margin: 0, paddingLeft: '20px' }}>
-            <li>LINEアプリを開く</li>
-            <li>YOAKEからのメッセージを確認</li>
-            <li>「アカウント連携に進む」をタップ</li>
-            <li>登録したメールアドレスを入力</li>
-            <li>連携完了！</li>
-          </ol>
+    <div className="completion-page">
+      <div className="completion-container">
+        <div className="completion-content">
+          <div className="success-icon">
+            <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+              <circle cx="40" cy="40" r="40" fill="#4CAF50"/>
+              <path 
+                d="M25 40L35 50L55 30" 
+                stroke="white" 
+                strokeWidth="4" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          
+          <h1 className="completion-title">
+            完了しました！
+          </h1>
+          
+          <p className="completion-message">
+            処理が正常に完了しました。<br />
+            LINEメニューからサービスをご利用ください。
+          </p>
+          
+          <div className="completion-actions">
+            <button 
+              className="btn btn-primary"
+              onClick={handleClose}
+            >
+              LINEに戻る
+            </button>
+            
+            <Link 
+              to="/membership-card" 
+              className="btn btn-secondary"
+            >
+              会員証を確認
+            </Link>
+          </div>
+          
+          <p className="auto-close-message">
+            5秒後に自動的に閉じます...
+          </p>
         </div>
       </div>
-      
-      {/* 
-      メッセージが届かない場合のフォールバック
-      <div className="form-navigation" style={{ justifyContent: 'center', marginTop: '30px' }}>
-        <a 
-          href={lineOfficialAccountUrl} 
-          className="prev-btn" 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          style={{ textDecoration: 'none' }}
-        >
-          メッセージが届かない場合
-        </a>
-      </div>
-      */}
     </div>
   );
 };

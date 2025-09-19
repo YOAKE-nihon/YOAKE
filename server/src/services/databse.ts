@@ -1,18 +1,14 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { databaseConfig } from '../config';
 import { 
   User, 
   UserProfile, 
   Survey, 
   Store, 
   Visit, 
-  UserQueryParams, 
-  VisitQueryParams,
-  ChartData,
   MembershipCardData,
   AppError 
 } from '../types';
-import { databaseConfig } from '../config';
-import { getCurrentTimestamp, generateUUID, countBy } from '../utils';
 
 class DatabaseService {
   private supabase: SupabaseClient;
@@ -25,40 +21,26 @@ class DatabaseService {
   }
 
   // User operations
-  async createUser(userData: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
-    const now = getCurrentTimestamp();
-    const user: User = {
-      id: generateUUID(),
-      ...userData,
-      created_at: now,
-      updated_at: now,
-    };
-
+  async createUser(userData: {
+    email: string;
+    phone?: string;
+    gender?: string;
+    birth_date: string;
+    line_user_id?: string;
+    stripe_customer_id?: string;
+  }): Promise<User> {
     const { data, error } = await this.supabase
       .from('users')
-      .insert([user])
+      .insert(userData)
       .select()
       .single();
 
     if (error) {
-      throw new AppError(`Failed to create user: ${error.message}`, 500);
+      console.error('Database error creating user:', error);
+      throw new AppError('ユーザーの作成に失敗しました', 500);
     }
 
     return data;
-  }
-
-  async getUserById(id: string): Promise<User | null> {
-    const { data, error } = await this.supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      throw new AppError(`Failed to get user: ${error.message}`, 500);
-    }
-
-    return data || null;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
@@ -69,10 +51,11 @@ class DatabaseService {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      throw new AppError(`Failed to get user by email: ${error.message}`, 500);
+      console.error('Database error getting user by email:', error);
+      throw new AppError('ユーザー情報の取得に失敗しました', 500);
     }
 
-    return data || null;
+    return data;
   }
 
   async getUserByLineId(lineUserId: string): Promise<User | null> {
@@ -83,66 +66,51 @@ class DatabaseService {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      throw new AppError(`Failed to get user by LINE ID: ${error.message}`, 500);
+      console.error('Database error getting user by LINE ID:', error);
+      throw new AppError('ユーザー情報の取得に失敗しました', 500);
     }
 
-    return data || null;
+    return data;
   }
 
-  async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'created_at'>>): Promise<User> {
-    const now = getCurrentTimestamp();
-    const updateData = {
-      ...updates,
-      updated_at: now,
-    };
-
+  async updateUser(userId: string, updates: Partial<User>): Promise<User> {
     const { data, error } = await this.supabase
       .from('users')
-      .update(updateData)
-      .eq('id', id)
+      .update(updates)
+      .eq('id', userId)
       .select()
       .single();
 
     if (error) {
-      throw new AppError(`Failed to update user: ${error.message}`, 500);
+      console.error('Database error updating user:', error);
+      throw new AppError('ユーザー情報の更新に失敗しました', 500);
     }
 
     return data;
   }
 
-  async linkLineAccount(email: string, lineUserId: string): Promise<User> {
-    const user = await this.getUserByEmail(email);
-    if (!user) {
-      throw new AppError('ユーザーが見つかりません', 404);
-    }
-
-    return this.updateUser(user.id, { line_user_id: lineUserId });
-  }
-
-  // User profile operations
-  async createUserProfile(profileData: Omit<UserProfile, 'id' | 'created_at' | 'updated_at'>): Promise<UserProfile> {
-    const now = getCurrentTimestamp();
-    const profile: UserProfile = {
-      id: generateUUID(),
-      ...profileData,
-      created_at: now,
-      updated_at: now,
-    };
-
+  // Profile operations
+  async createProfile(profileData: {
+    user_id: string;
+    industry: string;
+    job_type: string;
+    experience_years: string;
+  }): Promise<UserProfile> {
     const { data, error } = await this.supabase
       .from('user_profiles')
-      .insert([profile])
+      .insert(profileData)
       .select()
       .single();
 
     if (error) {
-      throw new AppError(`Failed to create user profile: ${error.message}`, 500);
+      console.error('Database error creating profile:', error);
+      throw new AppError('プロフィールの作成に失敗しました', 500);
     }
 
     return data;
   }
 
-  async getUserProfile(userId: string): Promise<UserProfile | null> {
+  async getProfileByUserId(userId: string): Promise<UserProfile | null> {
     const { data, error } = await this.supabase
       .from('user_profiles')
       .select('*')
@@ -150,253 +118,160 @@ class DatabaseService {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      throw new AppError(`Failed to get user profile: ${error.message}`, 500);
+      console.error('Database error getting profile:', error);
+      throw new AppError('プロフィール情報の取得に失敗しました', 500);
     }
 
-    return data || null;
+    return data;
   }
 
   // Survey operations
-  async createSurvey(surveyData: Omit<Survey, 'id' | 'created_at'>): Promise<Survey> {
-    const survey: Survey = {
-      id: generateUUID(),
-      ...surveyData,
-      created_at: getCurrentTimestamp(),
-    };
-
+  async createSurvey(surveyData: {
+    user_id: string;
+    interest_in_side_job: string;
+    side_job_time?: string;
+    side_job_fields: string[];
+    side_job_fields_other?: string;
+    side_job_purpose?: string;
+    side_job_challenge?: string;
+    side_job_challenge_other?: string;
+    meet_people: string[];
+    service_benefit: string;
+    service_benefit_other?: string;
+    service_priority: string;
+  }): Promise<Survey> {
     const { data, error } = await this.supabase
       .from('surveys')
-      .insert([survey])
+      .insert(surveyData)
       .select()
       .single();
 
     if (error) {
-      throw new AppError(`Failed to create survey: ${error.message}`, 500);
+      console.error('Database error creating survey:', error);
+      throw new AppError('アンケートの保存に失敗しました', 500);
     }
 
     return data;
   }
 
-  async getSurveyByUserId(userId: string): Promise<Survey | null> {
-    const { data, error } = await this.supabase
-      .from('surveys')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw new AppError(`Failed to get survey: ${error.message}`, 500);
-    }
-
-    return data || null;
-  }
-
   // Store operations
-  async getStoreById(id: string): Promise<Store | null> {
-    const { data, error } = await this.supabase
-      .from('stores')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      throw new AppError(`Failed to get store: ${error.message}`, 500);
-    }
-
-    return data || null;
-  }
-
-  async getAllStores(): Promise<Store[]> {
+  async getStores(): Promise<Store[]> {
     const { data, error } = await this.supabase
       .from('stores')
       .select('*')
       .order('name');
 
     if (error) {
-      throw new AppError(`Failed to get stores: ${error.message}`, 500);
+      console.error('Database error getting stores:', error);
+      throw new AppError('店舗情報の取得に失敗しました', 500);
     }
 
     return data || [];
   }
 
-  // Visit operations
-  async createVisit(visitData: Omit<Visit, 'id' | 'created_at'>): Promise<Visit> {
-    const visit: Visit = {
-      id: generateUUID(),
-      ...visitData,
-      created_at: getCurrentTimestamp(),
-    };
-
+  async getStoreById(storeId: string): Promise<Store | null> {
     const { data, error } = await this.supabase
-      .from('visits')
-      .insert([visit])
-      .select()
-      .single();
-
-    if (error) {
-      throw new AppError(`Failed to create visit: ${error.message}`, 500);
-    }
-
-    return data;
-  }
-
-  async getVisitById(id: string): Promise<Visit | null> {
-    const { data, error } = await this.supabase
-      .from('visits')
+      .from('stores')
       .select('*')
-      .eq('id', id)
+      .eq('id', storeId)
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      throw new AppError(`Failed to get visit: ${error.message}`, 500);
-    }
-
-    return data || null;
-  }
-
-  async updateVisit(id: string, updates: Partial<Omit<Visit, 'id' | 'created_at'>>): Promise<Visit> {
-    const { data, error } = await this.supabase
-      .from('visits')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      throw new AppError(`Failed to update visit: ${error.message}`, 500);
+      console.error('Database error getting store:', error);
+      throw new AppError('店舗情報の取得に失敗しました', 500);
     }
 
     return data;
   }
 
-  async getVisitsByUserId(userId: string, params: VisitQueryParams = {}): Promise<Visit[]> {
-    let query = this.supabase
+  // Visit operations
+  async createVisit(visitData: {
+    user_id: string;
+    store_id: string;
+    check_in_at?: string;
+  }): Promise<Visit> {
+    const { data, error } = await this.supabase
+      .from('visits')
+      .insert({
+        ...visitData,
+        check_in_at: visitData.check_in_at || new Date().toISOString(),
+      })
+      .select(`
+        *,
+        stores(name)
+      `)
+      .single();
+
+    if (error) {
+      console.error('Database error creating visit:', error);
+      throw new AppError('チェックインの記録に失敗しました', 500);
+    }
+
+    return data;
+  }
+
+  async updateVisit(visitId: string, updates: {
+    visit_type?: 'single' | 'group';
+    visit_purpose?: string;
+    companion_industries?: string[];
+    companion_job_types?: string[];
+  }): Promise<Visit> {
+    const { data, error } = await this.supabase
+      .from('visits')
+      .update(updates)
+      .eq('id', visitId)
+      .select(`
+        *,
+        stores(name)
+      `)
+      .single();
+
+    if (error) {
+      console.error('Database error updating visit:', error);
+      throw new AppError('来店情報の更新に失敗しました', 500);
+    }
+
+    return data;
+  }
+
+  async getVisitsByUserId(userId: string, limit = 50): Promise<Visit[]> {
+    const { data, error } = await this.supabase
       .from('visits')
       .select(`
         *,
-        stores (
-          id,
-          name,
-          address
-        )
+        stores(name)
       `)
-      .eq('user_id', userId);
-
-    if (params.dateFrom) {
-      query = query.gte('check_in_at', params.dateFrom);
-    }
-
-    if (params.dateTo) {
-      query = query.lte('check_in_at', params.dateTo);
-    }
-
-    if (params.limit) {
-      query = query.limit(params.limit);
-    }
-
-    if (params.offset) {
-      query = query.range(params.offset, params.offset + (params.limit || 10) - 1);
-    }
-
-    query = query.order('check_in_at', { ascending: false });
-
-    const { data, error } = await query;
+      .eq('user_id', userId)
+      .order('check_in_at', { ascending: false })
+      .limit(limit);
 
     if (error) {
-      throw new AppError(`Failed to get visits: ${error.message}`, 500);
+      console.error('Database error getting visits:', error);
+      throw new AppError('来店履歴の取得に失敗しました', 500);
     }
 
     return data || [];
   }
 
-  async getVisitStatsForUser(userId: string): Promise<{
-    totalVisits: number;
-    favoriteStore: string;
-    recentVisits: Array<{ date: string; storeName: string }>;
-  }> {
-    // Get all visits for the user with store information
-    const { data: visits, error } = await this.supabase
+  async getVisitById(visitId: string): Promise<Visit | null> {
+    const { data, error } = await this.supabase
       .from('visits')
       .select(`
         *,
-        stores (
-          name
-        )
+        stores(name)
       `)
-      .eq('user_id', userId)
-      .order('check_in_at', { ascending: false });
+      .eq('id', visitId)
+      .single();
 
-    if (error) {
-      throw new AppError(`Failed to get visit stats: ${error.message}`, 500);
+    if (error && error.code !== 'PGRST116') {
+      console.error('Database error getting visit:', error);
+      throw new AppError('来店情報の取得に失敗しました', 500);
     }
 
-    const visitsData = visits || [];
-    const totalVisits = visitsData.length;
-
-    // Calculate favorite store
-    const storeCounts = countBy(visitsData, 'store_id');
-    const favoriteStoreId = Object.keys(storeCounts).reduce((a, b) => 
-      storeCounts[a] > storeCounts[b] ? a : b
-    , '');
-    
-    const favoriteStoreVisit = visitsData.find(v => v.store_id === favoriteStoreId);
-    const favoriteStore = favoriteStoreVisit?.stores?.name || 'N/A';
-
-    // Get recent visits (last 5)
-    const recentVisits = visitsData.slice(0, 5).map(visit => ({
-      date: visit.check_in_at,
-      storeName: visit.stores?.name || 'Unknown Store',
-    }));
-
-    return {
-      totalVisits,
-      favoriteStore,
-      recentVisits,
-    };
+    return data;
   }
 
-  async getVisitAnalyticsForUser(userId: string): Promise<{
-    companionIndustry: ChartData;
-    companionJobType: ChartData;
-    visitPurpose: ChartData;
-  }> {
-    const visits = await this.getVisitsByUserId(userId);
-
-    // Analyze companion industries
-    const companionIndustryData: ChartData = {};
-    visits.forEach(visit => {
-      if (visit.companion_industries) {
-        visit.companion_industries.forEach(industry => {
-          companionIndustryData[industry] = (companionIndustryData[industry] || 0) + 1;
-        });
-      }
-    });
-
-    // Analyze companion job types
-    const companionJobTypeData: ChartData = {};
-    visits.forEach(visit => {
-      if (visit.companion_job_types) {
-        visit.companion_job_types.forEach(jobType => {
-          companionJobTypeData[jobType] = (companionJobTypeData[jobType] || 0) + 1;
-        });
-      }
-    });
-
-    // Analyze visit purposes
-    const visitPurposeData: ChartData = {};
-    visits.forEach(visit => {
-      if (visit.visit_purpose) {
-        visitPurposeData[visit.visit_purpose] = (visitPurposeData[visit.visit_purpose] || 0) + 1;
-      }
-    });
-
-    return {
-      companionIndustry: companionIndustryData,
-      companionJobType: companionJobTypeData,
-      visitPurpose: visitPurposeData,
-    };
-  }
-
+  // Analytics operations
   async getMembershipCardData(lineUserId: string): Promise<MembershipCardData | null> {
     // Get user by LINE ID
     const user = await this.getUserByLineId(lineUserId);
@@ -404,47 +279,106 @@ class DatabaseService {
       return null;
     }
 
-    // Get visit stats and analytics
-    const [stats, charts] = await Promise.all([
-      this.getVisitStatsForUser(user.id),
-      this.getVisitAnalyticsForUser(user.id),
-    ]);
-
-    // Mock LINE profile data (in production, this would come from LINE API)
-    const profileData = {
-      name: 'ユーザー', // Default name, should be fetched from LINE
-      avatarUrl: 'https://via.placeholder.com/150', // Default avatar
-    };
-
-    return {
-      profile: profileData,
-      charts,
-      stats,
-    };
-  }
-
-  // Health check
-  async healthCheck(): Promise<boolean> {
     try {
-      const { error } = await this.supabase
-        .from('users')
-        .select('count')
-        .limit(1);
+      // Get visit statistics
+      const { data: statsData, error: statsError } = await this.supabase
+        .rpc('get_user_visit_stats', { user_uuid: user.id });
 
-      return !error;
+      if (statsError) {
+        console.error('Error getting visit stats:', statsError);
+        throw new AppError('統計データの取得に失敗しました', 500);
+      }
+
+      // Get visit analytics
+      const { data: analyticsData, error: analyticsError } = await this.supabase
+        .rpc('get_user_visit_analytics', { user_uuid: user.id });
+
+      if (analyticsError) {
+        console.error('Error getting visit analytics:', analyticsError);
+        throw new AppError('分析データの取得に失敗しました', 500);
+      }
+
+      const stats = statsData || {};
+      const analytics = analyticsData || {};
+
+      return {
+        profile: {
+          name: 'ユーザー', // Will be updated with LINE profile
+          avatarUrl: '',
+        },
+        charts: {
+          companionIndustry: analytics.companion_industry || {},
+          companionJobType: analytics.companion_job_type || {},
+          visitPurpose: analytics.visit_purpose || {},
+        },
+        stats: {
+          totalVisits: stats.total_visits || 0,
+          favoriteStore: stats.favorite_store || 'なし',
+          recentVisits: stats.recent_visits || [],
+        },
+      };
     } catch (error) {
-      return false;
+      console.error('Error building membership card data:', error);
+      throw new AppError('会員証データの構築に失敗しました', 500);
     }
   }
 
-  // Transaction helper (Supabase doesn't support transactions directly)
-  async withTransaction<T>(callback: (db: DatabaseService) => Promise<T>): Promise<T> {
-    // For now, just execute the callback
-    // In a real implementation, you might want to implement rollback logic
-    return await callback(this);
+  // Utility operations
+  async linkLineAccount(email: string, lineUserId: string): Promise<User> {
+    const user = await this.getUserByEmail(email);
+    if (!user) {
+      throw new AppError('ユーザーが見つかりません', 404);
+    }
+
+    return await this.updateUser(user.id, { line_user_id: lineUserId });
+  }
+
+  async setPasswordResetToken(email: string, token: string, expiresAt: Date): Promise<void> {
+    const { error } = await this.supabase
+      .from('users')
+      .update({
+        password_reset_token: token,
+        password_reset_expires: expiresAt.toISOString(),
+      })
+      .eq('email', email);
+
+    if (error) {
+      console.error('Database error setting password reset token:', error);
+      throw new AppError('パスワードリセットトークンの設定に失敗しました', 500);
+    }
+  }
+
+  async verifyPasswordResetToken(token: string): Promise<User | null> {
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('*')
+      .eq('password_reset_token', token)
+      .gt('password_reset_expires', new Date().toISOString())
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Database error verifying reset token:', error);
+      throw new AppError('トークンの検証に失敗しました', 500);
+    }
+
+    return data;
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('users')
+      .update({
+        password_reset_token: null,
+        password_reset_expires: null,
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Database error clearing reset token:', error);
+      throw new AppError('リセットトークンのクリアに失敗しました', 500);
+    }
   }
 }
 
-// Export singleton instance
 export const db = new DatabaseService();
 export default db;

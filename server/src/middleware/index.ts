@@ -1,153 +1,116 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
-import { AppError, AuthenticatedRequest } from '../types';
-import { createErrorResponse, parseLineIdToken } from '../utils';
+import helmet from 'helmet';
+import jwt from 'jsonwebtoken';
 import { db } from '../services/database';
 import { lineService } from '../services/line';
-import { rateLimitConfig, isDevelopment } from '../config';
+import { config } from '../config';
+import { AuthenticatedRequest, AppError } from '../types';
+import { createErrorResponse, logError } from '../utils';
 
-/**
- * Global error handler middleware
- */
-export const errorHandler = (
-  error: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  console.error(`Error in ${req.method} ${req.path}:`, error);
-
-  // Handle known AppError instances
-  if (error instanceof AppError) {
-    res.status(error.statusCode).json(
-      createErrorResponse(error.message)
-    );
-    return;
-  }
-
-  // Handle validation errors
-  if (error.name === 'ValidationError') {
-    res.status(400).json(
-      createErrorResponse('入力データが正しくありません', error.message)
-    );
-    return;
-  }
-
-  // Handle database errors
-  if (error.message?.includes('duplicate key') || error.message?.includes('unique constraint')) {
-    res.status(409).json(
-      createErrorResponse('データが既に存在します')
-    );
-    return;
-  }
-
-  // Handle unauthorized errors
-  if (error.message?.includes('unauthorized') || error.message?.includes('forbidden')) {
-    res.status(401).json(
-      createErrorResponse('認証が必要です')
-    );
-    return;
-  }
-
-  // Default server error
-  res.status(500).json(
-    createErrorResponse(
-      isDevelopment 
-        ? `サーバーエラー: ${error.message}`
-        : 'サーバー内部でエラーが発生しました'
-    )
-  );
-};
-
-/**
- * Request logging middleware
- */
-export const requestLogger = (req: Request, res: Response, next: NextFunction): void => {
-  const start = Date.now();
-  
-  // Log request
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  
-  if (isDevelopment && req.body && Object.keys(req.body).length > 0) {
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-  }
-
-  // Log response when finished
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(
-      `${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`
-    );
-  });
-
-  next();
-};
-
-/**
- * Rate limiting middleware
- */
-export const rateLimiter = rateLimit(rateLimitConfig);
-
-/**
- * API-specific rate limiter (more restrictive)
- */
-export const apiRateLimiter = rateLimit({
-  ...rateLimitConfig,
-  max: isDevelopment ? 1000 : 50, // Lower limit for API endpoints
-  message: createErrorResponse('APIリクエストが多すぎます。しばらく待ってからお試しください。'),
+// Security middleware
+export const securityMiddleware = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://api.line.me", "https://api.stripe.com"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
 });
 
-/**
- * Authentication middleware for LINE users
- */
-export const authenticateLineUser = async (
+// Rate limiting middleware
+export const rateLimitMiddleware = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Strict rate limiting for sensitive endpoints
+export const strictRateLimitMiddleware = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // limit each IP to 5 requests per hour
+  message: {
+    error: 'Too many attempts, please try again later.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// CORS middleware
+export const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'https://liff.line.me',
+      'https://liff-gateway.lineml.jp',
+      'https://liff.line-beta.me',
+      'http://localhost:3000',
+      'http://localhost:3001',
+    ];
+    
+    if (config.server.nodeEnv === 'development') {
+      allowedOrigins.push('http://localhost:3000', 'http://localhost:3001');
+    }
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-line-signature'],
+};
+
+// Authentication middleware for LINE ID token
+export const authenticateLineToken = async (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    const idToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     
-    if (!idToken) {
-      res.status(401).json(
-        createErrorResponse('認証トークンが必要です')
-      );
-      return;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json(createErrorResponse('認証トークンが必要です'));
     }
-
-    // Parse LINE ID token
-    const lineProfile = parseLineIdToken(idToken);
+    
+    const idToken = authHeader.substring(7);
+    
+    // Verify LINE ID token
+    const lineProfile = await lineService.verifyIdToken(idToken);
+    if (!lineProfile) {
+      return res.status(401).json(createErrorResponse('無効な認証トークンです'));
+    }
     
     // Get user from database
     const user = await db.getUserByLineId(lineProfile.sub);
     if (!user) {
-      res.status(401).json(
-        createErrorResponse('ユーザーが見つかりません。アカウント連携を完了してください。')
-      );
-      return;
+      return res.status(404).json(createErrorResponse('ユーザーが見つかりません'));
     }
-
-    // Add user and LINE profile to request
+    
     req.user = user;
-    req.lineProfile = {
-      userId: lineProfile.sub,
-      displayName: lineProfile.name || 'Unknown User',
-      pictureUrl: lineProfile.picture,
-    };
-
+    req.lineProfile = lineProfile;
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    res.status(401).json(
-      createErrorResponse('認証に失敗しました')
-    );
+    logError(error as Error, 'authenticateLineToken');
+    return res.status(401).json(createErrorResponse('認証に失敗しました'));
   }
 };
 
-/**
- * Optional authentication middleware (doesn't fail if no token)
- */
+// Optional authentication middleware
 export const optionalAuthentication = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -155,194 +118,177 @@ export const optionalAuthentication = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    const idToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     
-    if (idToken) {
-      const lineProfile = parseLineIdToken(idToken);
-      const user = await db.getUserByLineId(lineProfile.sub);
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const idToken = authHeader.substring(7);
       
-      if (user) {
-        req.user = user;
-        req.lineProfile = {
-          userId: lineProfile.sub,
-          displayName: lineProfile.name || 'Unknown User',
-          pictureUrl: lineProfile.picture,
-        };
+      try {
+        const lineProfile = await lineService.verifyIdToken(idToken);
+        if (lineProfile) {
+          const user = await db.getUserByLineId(lineProfile.sub);
+          if (user) {
+            req.user = user;
+            req.lineProfile = lineProfile;
+          }
+        }
+      } catch (error) {
+        // Ignore authentication errors in optional mode
+        logError(error as Error, 'optionalAuthentication');
       }
     }
-
+    
     next();
   } catch (error) {
-    // Don't fail for optional authentication
-    console.warn('Optional authentication failed:', error);
+    // Continue without authentication
     next();
   }
 };
 
-/**
- * Validate request body middleware
- */
-export const validateRequestBody = (requiredFields: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const missingFields = requiredFields.filter(field => {
-      const value = req.body[field];
-      return value === undefined || value === null || value === '';
-    });
-
-    if (missingFields.length > 0) {
-      res.status(400).json(
-        createErrorResponse(
-          `必須フィールドが不足しています: ${missingFields.join(', ')}`
-        )
-      );
-      return;
-    }
-
-    next();
-  };
-};
-
-/**
- * Validate query parameters middleware
- */
-export const validateQueryParams = (requiredParams: string[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const missingParams = requiredParams.filter(param => {
-      const value = req.query[param];
-      return value === undefined || value === null || value === '';
-    });
-
-    if (missingParams.length > 0) {
-      res.status(400).json(
-        createErrorResponse(
-          `必須パラメータが不足しています: ${missingParams.join(', ')}`
-        )
-      );
-      return;
-    }
-
-    next();
-  };
-};
-
-/**
- * CORS preflight handler
- */
-export const corsPreflightHandler = (req: Request, res: Response, next: NextFunction): void => {
-  if (req.method === 'OPTIONS') {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-};
-
-/**
- * Health check endpoint middleware
- */
-export const healthCheck = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  if (req.path === '/health' || req.path === '/api/health') {
-    try {
-      // Check database connectivity
-      const dbHealthy = await db.healthCheck();
-      
-      const health = {
-        status: dbHealthy ? 'healthy' : 'unhealthy',
-        timestamp: new Date().toISOString(),
-        version: '1.0.0',
-        environment: process.env.NODE_ENV || 'development',
-        database: dbHealthy ? 'connected' : 'disconnected',
-        uptime: process.uptime(),
-      };
-
-      res.status(dbHealthy ? 200 : 503).json(health);
-    } catch (error) {
-      res.status(503).json({
-        status: 'unhealthy',
-        timestamp: new Date().toISOString(),
-        error: 'Health check failed',
-      });
-    }
-    return;
-  }
-
-  next();
-};
-
-/**
- * Security headers middleware
- */
-export const securityHeaders = (req: Request, res: Response, next: NextFunction): void => {
-  // Remove sensitive headers
-  res.removeHeader('X-Powered-By');
-  
-  // Add security headers
-  res.header('X-Content-Type-Options', 'nosniff');
-  res.header('X-Frame-Options', 'DENY');
-  res.header('X-XSS-Protection', '1; mode=block');
-  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
-  // CSP for API endpoints
-  if (req.path.startsWith('/api/')) {
-    res.header('Content-Security-Policy', "default-src 'none'");
-  }
-
-  next();
-};
-
-/**
- * JSON parsing error handler
- */
-export const jsonErrorHandler = (error: Error, req: Request, res: Response, next: NextFunction): void => {
-  if (error instanceof SyntaxError && 'body' in error && (error as any).type === 'entity.parse.failed') {
-    res.status(400).json(
-      createErrorResponse('JSONの形式が正しくありません')
-    );
-    return;
-  }
-
-  next(error);
-};
-
-/**
- * Request timeout middleware
- */
-export const requestTimeout = (timeoutMs: number = 30000) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const timeout = setTimeout(() => {
-      if (!res.headersSent) {
-        res.status(408).json(
-          createErrorResponse('リクエストがタイムアウトしました')
-        );
-      }
-    }, timeoutMs);
-
-    res.on('finish', () => {
-      clearTimeout(timeout);
-    });
-
-    res.on('close', () => {
-      clearTimeout(timeout);
-    });
-
-    next();
-  };
-};
-
-/**
- * Development middleware (only in development mode)
- */
-export const developmentMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  if (isDevelopment) {
-    // Log all headers in development
-    console.log('Request headers:', req.headers);
+// Admin authentication middleware
+export const authenticateAdmin = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
     
-    // Add development-specific headers
-    res.header('X-Development-Mode', 'true');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json(createErrorResponse('管理者認証が必要です'));
+    }
+    
+    const token = authHeader.substring(7);
+    
+    // Verify JWT token for admin
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    
+    if (!decoded.isAdmin) {
+      return res.status(403).json(createErrorResponse('管理者権限が必要です'));
+    }
+    
+    req.user = decoded;
+    next();
+  } catch (error) {
+    logError(error as Error, 'authenticateAdmin');
+    return res.status(401).json(createErrorResponse('管理者認証に失敗しました'));
   }
+};
 
+// Request logging middleware
+export const requestLogger = (req: Request, res: Response, next: NextFunction): void => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const { method, originalUrl } = req;
+    const { statusCode } = res;
+    
+    console.log(`[${new Date().toISOString()}] ${method} ${originalUrl} - ${statusCode} (${duration}ms)`);
+  });
+  
   next();
+};
+
+// Error handling middleware
+export const errorHandler = (
+  error: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  logError(error, 'errorHandler');
+  
+  if (error instanceof AppError) {
+    return res.status(error.statusCode).json(createErrorResponse(error.message));
+  }
+  
+  // Handle specific error types
+  if (error.name === 'ValidationError') {
+    return res.status(400).json(createErrorResponse('入力データが無効です'));
+  }
+  
+  if (error.name === 'CastError') {
+    return res.status(400).json(createErrorResponse('無効なIDです'));
+  }
+  
+  if (error.name === 'MongoError' && (error as any).code === 11000) {
+    return res.status(409).json(createErrorResponse('データが既に存在します'));
+  }
+  
+  // Default error response
+  const statusCode = config.server.nodeEnv === 'production' ? 500 : 500;
+  const message = config.server.nodeEnv === 'production' 
+    ? 'サーバーエラーが発生しました' 
+    : error.message;
+  
+  res.status(statusCode).json(createErrorResponse(message));
+};
+
+// Validation middleware factory
+export const validateRequest = (schema: any) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const { error, value } = schema.validate(req.body);
+    
+    if (error) {
+      const errorMessage = error.details.map((detail: any) => detail.message).join(', ');
+      return res.status(400).json(createErrorResponse(errorMessage));
+    }
+    
+    req.body = value;
+    next();
+  };
+};
+
+// Content type validation middleware
+export const validateContentType = (allowedTypes: string[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const contentType = req.headers['content-type'];
+    
+    if (!contentType || !allowedTypes.some(type => contentType.includes(type))) {
+      return res.status(400).json(createErrorResponse('無効なContent-Type'));
+    }
+    
+    next();
+  };
+};
+
+// LINE webhook signature validation middleware
+export const validateLineSignature = (req: Request, res: Response, next: NextFunction): void => {
+  try {
+    const signature = req.headers['x-line-signature'] as string;
+    const body = req.body;
+    
+    if (!signature) {
+      return res.status(400).json(createErrorResponse('署名が必要です'));
+    }
+    
+    const isValid = lineService.validateSignature(body.toString(), signature);
+    
+    if (!isValid) {
+      return res.status(401).json(createErrorResponse('無効な署名です'));
+    }
+    
+    next();
+  } catch (error) {
+    logError(error as Error, 'validateLineSignature');
+    return res.status(400).json(createErrorResponse('署名の検証に失敗しました'));
+  }
+};
+
+// Async error wrapper
+export const asyncWrapper = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
+// Health check middleware
+export const healthCheck = (req: Request, res: Response): void => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    version: process.env.npm_package_version || '1.0.0',
+  });
 };
