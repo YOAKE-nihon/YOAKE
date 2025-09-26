@@ -13,7 +13,7 @@ interface UseLiffReturn {
   error: string | null;
   loading: boolean;
   login: () => Promise<void>;
-  getIdToken: () => string | null; // getIdToken を追加
+  getIdToken: () => string | null;
 }
 
 const useLiff = (liffId: string): UseLiffReturn => {
@@ -28,15 +28,17 @@ const useLiff = (liffId: string): UseLiffReturn => {
         setLoading(true);
         setError(null);
 
-        if (!window.liff) {
+        // 型アサーションで型エラーを回避
+        const liff = (window as any).liff;
+        if (!liff) {
           throw new Error('LIFF SDKが読み込まれていません');
         }
 
-        await window.liff.init({ liffId });
+        await liff.init({ liffId });
 
-        if (window.liff.isLoggedIn()) {
+        if (liff.isLoggedIn()) {
           setIsLoggedIn(true);
-          const userProfile = await window.liff.getProfile();
+          const userProfile = await liff.getProfile();
           setProfile({
             userId: userProfile.userId,
             displayName: userProfile.displayName,
@@ -57,8 +59,9 @@ const useLiff = (liffId: string): UseLiffReturn => {
 
   const login = async (): Promise<void> => {
     try {
-      if (window.liff && !window.liff.isLoggedIn()) {
-        window.liff.login();
+      const liff = (window as any).liff;
+      if (liff && !liff.isLoggedIn()) {
+        liff.login();
       }
     } catch (err: any) {
       console.error('ログインエラー:', err);
@@ -68,9 +71,9 @@ const useLiff = (liffId: string): UseLiffReturn => {
 
   const getIdToken = (): string | null => {
     try {
-      if (window.liff && window.liff.isLoggedIn()) {
-        const liff = window.liff as any;
-        return liff.getIDToken ? liff.getIDToken() : null;
+      const liff = (window as any).liff;
+      if (liff && liff.isLoggedIn() && liff.getIDToken) {
+        return liff.getIDToken();
       }
       return null;
     } catch (err: any) {
@@ -85,7 +88,7 @@ const useLiff = (liffId: string): UseLiffReturn => {
     error,
     loading,
     login,
-    getIdToken, // getIdToken を戻り値に追加
+    getIdToken,
   };
 };
 

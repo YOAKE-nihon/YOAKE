@@ -44,36 +44,37 @@ const StoreCheckinPage: React.FC = () => {
   const { time, start: startTimer, stop: stopTimer } = useTimer();
 
   const handleScanQr = useCallback(async () => {
-    if (!window.liff) {
+    const liff = (window as any).liff;
+    if (!liff) {
       return;
     }
-
+  
     try {
-      const result = await window.liff.scanCodeV2();
+      const result = await liff.scanCodeV2();
       if (!result?.value) {
         throw new Error('QRコードの読み取りに失敗しました');
       }
-
+  
       const qrData = parseQRCode(result.value);
       if (!qrData) {
         throw new Error('無効なQRコードです');
       }
-
+  
       if (!profile?.userId) {
         throw new Error('LINE認証情報が取得できませんでした');
       }
-
+  
       const checkinResult = await executeCheckin(() =>
         userApi.checkIn({
           lineUserId: profile.userId,
           storeId: qrData.store_id,
         })
       );
-
+  
       if (checkinResult?.visitId) {
         setVisitId(checkinResult.visitId);
         setView('coupon');
-        startTimer(); // Start the timer for coupon display
+        startTimer();
       }
     } catch (error) {
       console.error('QR scan/check-in error:', error);

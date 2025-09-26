@@ -221,8 +221,9 @@ export const isLiffEnvironment = (): boolean => {
 
 export const closeLiffWindow = () => {
   try {
-    if (window.liff && window.liff.isInClient()) {
-      window.liff.closeWindow();
+    const liff = (window as any).liff;
+    if (liff && liff.isInClient()) {
+      liff.closeWindow();
     } else {
       window.close();
     }
