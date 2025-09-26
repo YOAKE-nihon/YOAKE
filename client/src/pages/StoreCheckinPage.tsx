@@ -186,7 +186,7 @@ const StoreCheckinPage: React.FC = () => {
             <h3 className="coupon-title">特典クーポン</h3>
             <div className="coupon-box">
               <p className="coupon-text">お好きなドリンク1杯無料</p>
-              <p className="coupon-time">{time.toLocaleTimeString('ja-JP')}</p>
+              <p className="coupon-time">{new Date(time * 1000).toLocaleTimeString('ja-JP')}</p>
             </div>
             <p className="form-description">
               この画面を店員にお見せください。
