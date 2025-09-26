@@ -28,17 +28,16 @@ const useLiff = (liffId: string): UseLiffReturn => {
         setLoading(true);
         setError(null);
 
-        // 型アサーションで型エラーを回避
-        const liff = (window as any).liff;
-        if (!liff) {
+        // window.liff を使用（型定義は別ファイルで拡張）
+        if (!window.liff) {
           throw new Error('LIFF SDKが読み込まれていません');
         }
 
-        await liff.init({ liffId });
+        await window.liff.init({ liffId });
 
-        if (liff.isLoggedIn()) {
+        if (window.liff.isLoggedIn()) {
           setIsLoggedIn(true);
-          const userProfile = await liff.getProfile();
+          const userProfile = await window.liff.getProfile();
           setProfile({
             userId: userProfile.userId,
             displayName: userProfile.displayName,
@@ -59,9 +58,8 @@ const useLiff = (liffId: string): UseLiffReturn => {
 
   const login = async (): Promise<void> => {
     try {
-      const liff = (window as any).liff;
-      if (liff && !liff.isLoggedIn()) {
-        liff.login();
+      if (window.liff && !window.liff.isLoggedIn()) {
+        window.liff.login();
       }
     } catch (err: any) {
       console.error('ログインエラー:', err);
@@ -71,9 +69,8 @@ const useLiff = (liffId: string): UseLiffReturn => {
 
   const getIdToken = (): string | null => {
     try {
-      const liff = (window as any).liff;
-      if (liff && liff.isLoggedIn() && liff.getIDToken) {
-        return liff.getIDToken();
+      if (window.liff && window.liff.isLoggedIn() && window.liff.getIDToken) {
+        return window.liff.getIDToken();
       }
       return null;
     } catch (err: any) {

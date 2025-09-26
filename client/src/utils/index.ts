@@ -203,7 +203,10 @@ export const removeStorageItem = (key: string): boolean => {
 // LIFF utilities
 export const closeLiffWindow = (): void => {
   try {
-    if (typeof window !== 'undefined' && window.liff && window.liff.isInClient()) {
+    if (typeof window !== 'undefined' && 
+        window.liff && 
+        window.liff.isInClient?.() && 
+        window.liff.closeWindow) {
       window.liff.closeWindow();
     } else if (typeof window !== 'undefined') {
       // LIFF外の場合は履歴を戻る
@@ -216,7 +219,9 @@ export const closeLiffWindow = (): void => {
 
 export const isLiffEnvironment = (): boolean => {
   try {
-    return typeof window !== 'undefined' && window.liff && window.liff.isInClient();
+    return typeof window !== 'undefined' && 
+           Boolean(window.liff) && 
+           Boolean(window.liff?.isInClient?.());
   } catch {
     return false;
   }
