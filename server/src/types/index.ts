@@ -309,3 +309,31 @@ export type ExperienceYears = typeof EXPERIENCE_YEARS_OPTIONS[number];
 export type Industry = typeof INDUSTRY_OPTIONS[number];
 export type JobType = typeof JOB_TYPE_OPTIONS[number];
 export type VisitPurpose = typeof VISIT_PURPOSE_OPTIONS[number];
+// QR Code data structure
+export interface QRCodeData {
+  app: string;
+  type: string;
+  store_id: string;
+  timestamp?: number;
+}
+
+// LIFF Window interface
+declare global {
+  interface Window {
+    liff: {
+      init: (config: { liffId: string }) => Promise<void>;
+      isLoggedIn: () => boolean;
+      isInClient: () => boolean;
+      login: () => void;
+      logout: () => void;
+      getProfile: () => Promise<{
+        userId: string;
+        displayName: string;
+        pictureUrl?: string;
+        statusMessage?: string;
+      }>;
+      scanCodeV2: () => Promise<{ value: string } | null>;
+      closeWindow: () => void;
+    };
+  }
+}
