@@ -68,8 +68,9 @@ const useLiff = (liffId: string): UseLiffReturn => {
 
   const getIdToken = (): string | null => {
     try {
-      if (window.liff && window.liff.isLoggedIn() && window.liff.getIDToken) {
-        return window.liff.getIDToken();
+      if (window.liff && window.liff.isLoggedIn()) {
+        const liff = window.liff as any;
+        return liff.getIDToken ? liff.getIDToken() : null;
       }
       return null;
     } catch (err: any) {
