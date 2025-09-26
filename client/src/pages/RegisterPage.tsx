@@ -84,7 +84,12 @@ const RegisterPage: React.FC = () => {
     // Validate form
     const validation = validateSurveyData(formData);
     if (!validation.isValid) {
-      setValidationErrors(validation.errors);
+      const errorObj: Record<string, string> = {};
+      validation.errors.forEach((error, index) => {
+        errorObj[`error${index}`] = error;
+      });
+      errorObj.form = validation.errors[0];
+      setValidationErrors(errorObj);
       return;
     }
 
