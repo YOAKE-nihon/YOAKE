@@ -138,14 +138,14 @@ const MembershipCardPage: React.FC = () => {
           <div className="card-chart-container">
             <div className="chart-wrapper">
               <Pie 
-                data={formatChartData(cardData.charts.companionIndustry, '業界')} 
+                data={formatChartData(cardData.charts.companionIndustry)} 
                 options={chartOptions} 
               />
               <p className="chart-label">業界</p>
             </div>
             <div className="chart-wrapper">
               <Pie 
-                data={formatChartData(cardData.charts.companionJobType, '職種')} 
+                data={formatChartData(cardData.charts.companionJobType)} 
                 options={chartOptions} 
               />
               <p className="chart-label">職種</p>
@@ -161,7 +161,7 @@ const MembershipCardPage: React.FC = () => {
             <p className="card-section-title">来店目的</p>
             <div className="chart-wrapper-full">
               <Pie 
-                data={formatChartData(cardData.charts.visitPurpose, '目的')} 
+                data={formatChartData(cardData.charts.visitPurpose)} 
                 options={chartOptions} 
               />
             </div>
