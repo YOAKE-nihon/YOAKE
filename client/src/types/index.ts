@@ -205,24 +205,3 @@ export interface QRCodeData {
   store_id: string;
   timestamp?: number;
 }
-
-// LIFF Window interface
-declare global {
-  interface Window {
-    liff: {
-      init: (config: { liffId: string }) => Promise<void>;
-      isLoggedIn: () => boolean;
-      isInClient: () => boolean;
-      login: () => void;
-      logout: () => void;
-      getProfile: () => Promise<{
-        userId: string;
-        displayName: string;
-        pictureUrl?: string;
-        statusMessage?: string;
-      }>;
-      scanCodeV2: () => Promise<{ value: string } | null>;
-      closeWindow: () => void;
-    };
-  }
-}
