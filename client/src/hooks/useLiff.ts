@@ -13,6 +13,7 @@ interface UseLiffReturn {
   error: string | null;
   loading: boolean;
   login: () => Promise<void>;
+  getIdToken: () => string | null; // getIdToken を追加
 }
 
 const useLiff = (liffId: string): UseLiffReturn => {
@@ -65,12 +66,25 @@ const useLiff = (liffId: string): UseLiffReturn => {
     }
   };
 
+  const getIdToken = (): string | null => {
+    try {
+      if (window.liff && window.liff.isLoggedIn()) {
+        return window.liff.getIDToken();
+      }
+      return null;
+    } catch (err: any) {
+      console.error('IDトークン取得エラー:', err);
+      return null;
+    }
+  };
+
   return {
     isLoggedIn,
     profile,
     error,
     loading,
     login,
+    getIdToken, // getIdToken を戻り値に追加
   };
 };
 
