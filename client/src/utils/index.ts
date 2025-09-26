@@ -1,101 +1,68 @@
-// Chart formatting utilities
-export const formatChartData = (data: Record<string, number>) => {
-  const labels = Object.keys(data);
-  const values = Object.values(data);
-  
-  return {
-    labels,
-    datasets: [
-      {
-        data: values,
-        backgroundColor: [
-          '#FF6384',
-          '#36A2EB', 
-          '#FFCE56',
-          '#4BC0C0',
-          '#9966FF',
-          '#FF9F40',
-        ],
-        borderWidth: 1,
-        borderColor: '#fff',
-      },
-    ],
-  };
-};
-
-export const chartOptions = {
-  responsive: true,
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-    },
-  },
-  maintainAspectRatio: false,
-};
-
 // Date utilities
-export const formatDate = (dateString: string): string => {
+export const formatDate = (date: Date): string => {
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return '不明な日付';
-    }
-    return date.toLocaleDateString('ja-JP', {
+    return new Intl.DateTimeFormat('ja-JP', {
       year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+      month: 'numeric',
+      day: 'numeric',
+    }).format(date);
   } catch {
-    return dateString;
+    return date.toLocaleDateString();
   }
 };
 
-export const formatDateTime = (dateString: string): string => {
+export const formatDateTime = (date: Date): string => {
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return '不明な日時';
-    }
-    return date.toLocaleString('ja-JP', {
+    return new Intl.DateTimeFormat('ja-JP', {
       year: 'numeric',
-      month: 'short',
+      month: 'numeric',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+    }).format(date);
   } catch {
-    return dateString;
+    return date.toLocaleString();
   }
 };
 
-export const formatTime = (dateString: string): string => {
+export const formatTime = (date: Date): string => {
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return '不明な時刻';
-    }
-    return date.toLocaleTimeString('ja-JP', {
+    return new Intl.DateTimeFormat('ja-JP', {
       hour: '2-digit',
       minute: '2-digit',
-    });
+    }).format(date);
   } catch {
-    return '不明な時刻';
+    return date.toLocaleTimeString();
+  }
+};
+
+export const parseQRCode = (qrData: string) => {
+  try {
+    if (!qrData || typeof qrData !== 'string') {
+      return null;
+    }
+    return JSON.parse(qrData);
+  } catch {
+    return null;
   }
 };
 
 // Validation utilities
 export const validateEmail = (email: string): boolean => {
+  if (!email || typeof email !== 'string') {
+    return false;
+  }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  return emailRegex.test(email.trim());
 };
 
 export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^[\d-+().\s]+$/;
-  return phoneRegex.test(phone) && phone.length >= 10;
-};
-
-export const validateRequired = (value: any): boolean => {
-  return value !== null && value !== undefined && value !== '';
+  if (!phone || typeof phone !== 'string') {
+    return false;
+  }
+  const cleanPhone = phone.replace(/[\s-()]/g, '');
+  const phoneRegex = /^[0-9+]{10,15}$/;
+  return phoneRegex.test(cleanPhone);
 };
 
 export const validateBirthDate = (birthDate: string): boolean => {
@@ -115,33 +82,17 @@ export const validateBirthDate = (birthDate: string): boolean => {
   }
 };
 
-export const validateSurveyData = (data: any): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  if (!data.email || !validateEmail(data.email)) {
-    errors.push('有効なメールアドレスを入力してください');
+export const validateRequired = (value: any): boolean => {
+  if (value === null || value === undefined) {
+    return false;
   }
-  
-  if (!data.birthDate || !validateBirthDate(data.birthDate)) {
-    errors.push('有効な生年月日を入力してください');
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
   }
-  
-  if (!validateRequired(data.industry)) {
-    errors.push('業界を選択してください');
+  if (Array.isArray(value)) {
+    return value.length > 0;
   }
-  
-  if (!validateRequired(data.jobType)) {
-    errors.push('職種を選択してください');
-  }
-  
-  if (!validateRequired(data.experienceYears)) {
-    errors.push('経験年数を選択してください');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
+  return true;
 };
 
 // Storage utilities (safe for SSR)
@@ -180,56 +131,25 @@ export const removeStorageItem = (key: string): boolean => {
   }
 };
 
-// Local storage utilities with JSON parsing
-export const setLocalStorage = (key: string, value: any): void => {
-  try {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error('Error setting localStorage:', error);
-  }
-};
-
-export const getLocalStorage = (key: string): any => {
-  try {
-    if (typeof window === 'undefined') return null;
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : null;
-  } catch (error) {
-    console.error('Error getting localStorage:', error);
-    return null;
-  }
-};
-
-export const removeLocalStorage = (key: string): void => {
-  try {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error('Error removing localStorage:', error);
-  }
-};
-
 // LIFF utilities
-export const isLiffEnvironment = (): boolean => {
+export const closeLiffWindow = (): void => {
   try {
-    return typeof window !== 'undefined' && !!window.liff && window.liff.isInClient();
-  } catch {
-    return false;
-  }
-};
-
-export const closeLiffWindow = () => {
-  try {
-    const liff = (window as any).liff;
-    if (liff && liff.isInClient()) {
-      liff.closeWindow();
-    } else {
-      window.close();
+    if (typeof window !== 'undefined' && window.liff && window.liff.isInClient()) {
+      window.liff.closeWindow();
+    } else if (typeof window !== 'undefined') {
+      // LIFF外の場合は履歴を戻る
+      window.history.back();
     }
   } catch (error) {
-    console.error('Error closing LIFF window:', error);
-    window.close();
+    console.error('Failed to close LIFF window:', error);
+  }
+};
+
+export const isLiffEnvironment = (): boolean => {
+  try {
+    return typeof window !== 'undefined' && window.liff && window.liff.isInClient();
+  } catch {
+    return false;
   }
 };
 
@@ -256,29 +176,6 @@ export const parseQRData = (qrData: string) => {
     }
     return JSON.parse(qrData);
   } catch {
-    return null;
-  }
-};
-
-export const parseQRCode = (qrCodeData: string) => {
-  try {
-    if (!qrCodeData || typeof qrCodeData !== 'string') {
-      return null;
-    }
-    
-    const parsedData = JSON.parse(qrCodeData);
-    
-    // Validate QR code structure for YOAKE app
-    if (parsedData && 
-        parsedData.app === 'yoake' && 
-        parsedData.type === 'check-in' && 
-        parsedData.store_id) {
-      return parsedData;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('QR Code parsing error:', error);
     return null;
   }
 };
@@ -396,6 +293,36 @@ export const retry = async <T>(
   throw lastError!;
 };
 
+// Validation utilities for forms
+export const validateSurveyData = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (!data.email || !validateEmail(data.email)) {
+    errors.push('有効なメールアドレスを入力してください');
+  }
+  
+  if (!data.birthDate || !validateBirthDate(data.birthDate)) {
+    errors.push('有効な生年月日を入力してください');
+  }
+  
+  if (!validateRequired(data.industry)) {
+    errors.push('業界を選択してください');
+  }
+  
+  if (!validateRequired(data.jobType)) {
+    errors.push('職種を選択してください');
+  }
+  
+  if (!validateRequired(data.experienceYears)) {
+    errors.push('経験年数を選択してください');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
+
 // Error logging utility
 export const logError = (error: Error, context?: string): void => {
   console.error(`[ERROR] ${context ? `[${context}] ` : ''}${error.message}`, {
@@ -404,7 +331,7 @@ export const logError = (error: Error, context?: string): void => {
   });
 };
 
-// API endpoints constants
+// Constants
 export const API_ENDPOINTS = {
   REGISTER: '/api/register',
   LOGIN: '/api/login',
@@ -415,4 +342,3 @@ export const API_ENDPOINTS = {
   CREATE_PAYMENT: '/api/create-payment-intent',
   STORES: '/api/stores',
 } as const;
-
