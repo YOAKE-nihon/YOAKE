@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiff, useApi } from '../hooks';
 import { userApi } from '../services/api';
@@ -16,14 +16,21 @@ const VisitHistoryPage: React.FC = () => {
     login
   } = useLiff(process.env.REACT_APP_LIFF_ID_HISTORY!);
 
-  const { loading, error, data: history, execute } = useApi<Visit[]>();
+  const { loading, error, execute } = useApi<{ visits: Visit[] }>();
+  
+  // ローカルstateでhistoryを管理
+  const [history, setHistory] = useState<Visit[]>([]);
 
   const fetchHistory = useCallback(async () => {
     if (!profile?.userId) return;
 
-    await execute(() =>
+    const result = await execute(() =>
       userApi.getVisitHistory({ lineUserId: profile.userId })
     );
+
+    if (result?.visits) {
+      setHistory(result.visits);
+    }
   }, [profile, execute]);
 
   useEffect(() => {
@@ -32,6 +39,7 @@ const VisitHistoryPage: React.FC = () => {
     }
   }, [isLoggedIn, profile, fetchHistory]);
 
+  // 以下は既存のコードと同じ
   // Loading state
   if (liffLoading) {
     return (
