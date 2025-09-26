@@ -16,7 +16,8 @@ const VisitHistoryPage: React.FC = () => {
     login
   } = useLiff(process.env.REACT_APP_LIFF_ID_HISTORY!);
 
-  const { loading, error, execute } = useApi<{ visits: Visit[] }>();
+  // 型定義を実際のAPIレスポンスに合わせて修正
+  const { loading, error, execute } = useApi<Visit[]>();
   
   // ローカルstateでhistoryを管理
   const [history, setHistory] = useState<Visit[]>([]);
@@ -28,18 +29,19 @@ const VisitHistoryPage: React.FC = () => {
       userApi.getVisitHistory({ lineUserId: profile.userId })
     );
 
-    if (result?.visits) {
-      setHistory(result.visits);
+    // APIが Visit[] を直接返すと仮定して修正
+    if (result) {
+      setHistory(result);
     }
   }, [profile, execute]);
 
+  // 残りのコードは同じ
   useEffect(() => {
     if (isLoggedIn && profile?.userId) {
       fetchHistory();
     }
   }, [isLoggedIn, profile, fetchHistory]);
 
-  // 以下は既存のコードと同じ
   // Loading state
   if (liffLoading) {
     return (
