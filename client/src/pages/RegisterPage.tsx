@@ -175,7 +175,7 @@ const RegisterPage: React.FC = () => {
       </p>
       
       {/* Form Errors */}
-      {registerError && <ErrorMessage message={registerError.message} />}
+      {registerError && <ErrorMessage message={registerError} />}
       {validationErrors.form && <ErrorMessage message={validationErrors.form} />}
       
       <form onSubmit={handleSubmit} className="form-content">

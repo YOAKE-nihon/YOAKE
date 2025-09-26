@@ -175,7 +175,7 @@ const StoreCheckinPage: React.FC = () => {
               </button>
             </div>
             {checkinError && (
-              <ErrorMessage message={checkinError.message} className="mt-4" />
+              <ErrorMessage message={checkinError} className="mt-4" />
             )}
           </>
         );
@@ -300,7 +300,7 @@ const StoreCheckinPage: React.FC = () => {
             </div>
 
             {surveyError && (
-              <ErrorMessage message={surveyError.message} className="mt-4" />
+              <ErrorMessage message={surveyError} className="mt-4" />
             )}
           </form>
         );

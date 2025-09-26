@@ -92,7 +92,7 @@ const MembershipCardPage: React.FC = () => {
       <div className="form-container">
         <h2 className="form-title">デジタル会員証</h2>
         <ErrorMessage 
-          message={error.message}
+          message={error}
           onRetry={fetchCardData}
         />
       </div>

@@ -69,7 +69,7 @@ const VisitHistoryPage: React.FC = () => {
     if (error) {
       return (
         <ErrorMessage 
-          message={error.message}
+          message={error}
           onRetry={fetchHistory}
         />
       );

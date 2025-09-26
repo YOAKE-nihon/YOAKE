@@ -93,7 +93,7 @@ const ForgotPasswordPage: React.FC = () => {
         
         {/* Error message */}
         {error && (
-          <ErrorMessage message={error.message} className="mt-4" />
+          <ErrorMessage message={error} className="mt-4" />
         )}
         
         {/* Back to register link */}
