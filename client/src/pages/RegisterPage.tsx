@@ -305,20 +305,20 @@ const RegisterPage: React.FC = () => {
           error={validationErrors.interestInSideJob}
         >
           <div className={`radio-group ${validationErrors.interestInSideJob ? 'input-error' : ''}`}>
-            {SIDE_JOB_INTEREST_OPTIONS.map(option => (
-              <label key={option.value} className="radio-label">
-                <input
-                  type="radio"
-                  name="interestInSideJob"
-                  value={option.value}
-                  checked={formData.interestInSideJob === option.value}
-                  onChange={(e) => handleInputChange('interestInSideJob', e.target.value)}
-                  required
-                />
-                <span className="radio-custom"></span>
-                {option.label}
-              </label>
-            ))}
+          {SIDE_JOB_INTEREST_OPTIONS.map(option => (
+            <label key={option} className="radio-label">
+              <input
+                type="radio"
+                name="interestInSideJob"
+                value={option}
+                checked={formData.interestInSideJob === option}
+                onChange={(e) => handleInputChange('interestInSideJob', e.target.value)}
+                required
+              />
+              <span className="radio-custom"></span>
+              {option}
+            </label>
+          ))}
           </div>
         </FormField>
 
