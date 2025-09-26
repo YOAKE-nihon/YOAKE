@@ -15,80 +15,15 @@ export const formatChartData = (data: Record<string, number>) => {
           '#4BC0C0',
           '#9966FF',
           '#FF9F40',
-          '#FF9F97',
-          '#4BC0C8',
         ],
-        borderWidth: 2,
+        borderWidth: 1,
         borderColor: '#fff',
-        hoverBorderWidth: 3,
       },
     ],
   };
 };
 
-// Chart options
-export const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-      labels: {
-        padding: 20,
-        font: {
-          size: 12,
-        },
-        usePointStyle: true,
-      },
-    },
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const label = context.label || '';
-          const value = context.parsed || 0;
-          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
-          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-          return `${label}: ${value}回 (${percentage}%)`;
-        },
-      },
-    },
-  },
-};
 
-// Date formatting utilities
-export const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return '不明な日付';
-    }
-    return date.toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  } catch {
-    return '不明な日付';
-  }
-};
-
-export const formatDateTime = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return '不明な日時';
-    }
-    return date.toLocaleString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return '不明な日時';
-  }
-};
 
 export const formatTime = (dateString: string): string => {
   try {
@@ -105,23 +40,7 @@ export const formatTime = (dateString: string): string => {
   }
 };
 
-// Form validation utilities
-export const validateEmail = (email: string): boolean => {
-  if (!email || typeof email !== 'string') {
-    return false;
-  }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email.trim());
-};
 
-export const validatePhone = (phone: string): boolean => {
-  if (!phone || typeof phone !== 'string') {
-    return false;
-  }
-  const cleanPhone = phone.replace(/[\s-()]/g, '');
-  const phoneRegex = /^[0-9+]{10,15}$/;
-  return phoneRegex.test(cleanPhone);
-};
 
 export const validateBirthDate = (birthDate: string): boolean => {
   if (!birthDate) {
@@ -140,18 +59,6 @@ export const validateBirthDate = (birthDate: string): boolean => {
   }
 };
 
-export const validateRequired = (value: any): boolean => {
-  if (value === null || value === undefined) {
-    return false;
-  }
-  if (typeof value === 'string') {
-    return value.trim().length > 0;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  return true;
-};
 
 // Storage utilities (safe for SSR)
 export const getStorageItem = (key: string): string | null => {
@@ -189,19 +96,6 @@ export const removeStorageItem = (key: string): boolean => {
   }
 };
 
-// LIFF utilities
-export const closeLiffWindow = (): void => {
-  try {
-    if (typeof window !== 'undefined' && window.liff && window.liff.isInClient()) {
-      window.liff.closeWindow();
-    } else if (typeof window !== 'undefined') {
-      // LIFF外の場合は履歴を戻る
-      window.history.back();
-    }
-  } catch (error) {
-    console.error('Failed to close LIFF window:', error);
-  }
-};
 
 export const isLiffEnvironment = (): boolean => {
   try {
@@ -418,30 +312,40 @@ declare global {
   }
 }
 
-// Chart utilities (for MembershipCardPage)
-export const formatChartData = (data: Record<string, number>) => {
-  const labels = Object.keys(data);
-  const values = Object.values(data);
-  
-  return {
-    labels,
-    datasets: [
-      {
-        data: values,
-        backgroundColor: [
-          '#FF6384',
-          '#36A2EB', 
-          '#FFCE56',
-          '#4BC0C0',
-          '#9966FF',
-          '#FF9F40'
-        ],
-        borderWidth: 1,
-      }
-    ]
-  };
+
+// Local storage utilities (for client-side data persistence)
+export const setLocalStorage = (key: string, value: any): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error('Error setting localStorage:', error);
+  }
 };
 
+export const getLocalStorage = (key: string): any => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  } catch (error) {
+    console.error('Error getting localStorage:', error);
+    return null;
+  }
+};
+
+export const removeLocalStorage = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error('Error removing localStorage:', error);
+  }
+};
+
+
+
+
+
+
+// Chart options (for MembershipCardPage) - formatChartDataは既存なのでskip
 export const chartOptions = {
   responsive: true,
   plugins: {
@@ -521,33 +425,6 @@ export const closeLiffWindow = () => {
   }
 };
 
-// Local storage utilities (for client-side data persistence)
-export const setLocalStorage = (key: string, value: any): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error('Error setting localStorage:', error);
-  }
-};
-
-export const getLocalStorage = (key: string): any => {
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : null;
-  } catch (error) {
-    console.error('Error getting localStorage:', error);
-    return null;
-  }
-};
-
-export const removeLocalStorage = (key: string): void => {
-  try {
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error('Error removing localStorage:', error);
-  }
-};
-
 // Form validation utilities
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -561,46 +438,4 @@ export const validatePhone = (phone: string): boolean => {
 
 export const validateRequired = (value: any): boolean => {
   return value !== null && value !== undefined && value !== '';
-};
-
-// 既存のコードはそのまま残して、以下を最後に追加
-
-// QR Code parsing function (alias for compatibility)
-export const parseQRCode = (qrCodeData: string) => {
-  try {
-    if (!qrCodeData || typeof qrCodeData !== 'string') {
-      return null;
-    }
-    
-    const parsedData = JSON.parse(qrCodeData);
-    
-    // Validate QR code structure
-    if (parsedData && 
-        parsedData.app === 'yoake' && 
-        parsedData.type === 'check-in' && 
-        parsedData.store_id) {
-      return parsedData;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('QR Code parsing error:', error);
-    return null;
-  }
-};
-
-// LIFF window utility (also missing)
-export const closeLiffWindow = () => {
-  try {
-    if (window.liff && window.liff.isInClient()) {
-      window.liff.closeWindow();
-    } else {
-      // Fallback for external browser
-      window.close();
-    }
-  } catch (error) {
-    console.error('Error closing LIFF window:', error);
-    // Fallback
-    window.close();
-  }
 };
