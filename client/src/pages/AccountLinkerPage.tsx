@@ -138,7 +138,7 @@ const AccountLinkerPage: React.FC = () => {
       </p>
       
       {/* Errors */}
-      {linkError && <ErrorMessage message={linkError.message} />}
+      {linkError && <ErrorMessage message={linkError} />}
       {status === 'error' && (
         <ErrorMessage message="アカウント連携に失敗しました。メールアドレスを確認してください。" />
       )}

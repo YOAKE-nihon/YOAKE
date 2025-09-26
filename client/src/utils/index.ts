@@ -1,3 +1,6 @@
+// YOAKE Client Utilities
+// 完全修正版 - 重複削除、型エラー修正済み
+
 // Chart formatting utilities
 export const formatChartData = (data: Record<string, number>) => {
   const labels = Object.keys(data);
@@ -23,7 +26,50 @@ export const formatChartData = (data: Record<string, number>) => {
   };
 };
 
+export const chartOptions = {
+  responsive: true,
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+    },
+  },
+  maintainAspectRatio: false,
+};
 
+// Date utilities
+export const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return '不明な日付';
+    }
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+};
+
+export const formatDateTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return '不明な日時';
+    }
+    return date.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return dateString;
+  }
+};
 
 export const formatTime = (dateString: string): string => {
   try {
@@ -40,7 +86,20 @@ export const formatTime = (dateString: string): string => {
   }
 };
 
+// Validation utilities
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
 
+export const validatePhone = (phone: string): boolean => {
+  const phoneRegex = /^[\d-+().\s]+$/;
+  return phoneRegex.test(phone) && phone.length >= 10;
+};
+
+export const validateRequired = (value: any): boolean => {
+  return value !== null && value !== undefined && value !== '';
+};
 
 export const validateBirthDate = (birthDate: string): boolean => {
   if (!birthDate) {
@@ -59,6 +118,34 @@ export const validateBirthDate = (birthDate: string): boolean => {
   }
 };
 
+export const validateSurveyData = (data: any): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (!data.email || !validateEmail(data.email)) {
+    errors.push('有効なメールアドレスを入力してください');
+  }
+  
+  if (!data.birthDate || !validateBirthDate(data.birthDate)) {
+    errors.push('有効な生年月日を入力してください');
+  }
+  
+  if (!validateRequired(data.industry)) {
+    errors.push('業界を選択してください');
+  }
+  
+  if (!validateRequired(data.jobType)) {
+    errors.push('職種を選択してください');
+  }
+  
+  if (!validateRequired(data.experienceYears)) {
+    errors.push('経験年数を選択してください');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
 
 // Storage utilities (safe for SSR)
 export const getStorageItem = (key: string): string | null => {
@@ -96,12 +183,55 @@ export const removeStorageItem = (key: string): boolean => {
   }
 };
 
+// Local storage utilities with JSON parsing
+export const setLocalStorage = (key: string, value: any): void => {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error('Error setting localStorage:', error);
+  }
+};
 
+export const getLocalStorage = (key: string): any => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  } catch (error) {
+    console.error('Error getting localStorage:', error);
+    return null;
+  }
+};
+
+export const removeLocalStorage = (key: string): void => {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error('Error removing localStorage:', error);
+  }
+};
+
+// LIFF utilities
 export const isLiffEnvironment = (): boolean => {
   try {
-    return typeof window !== 'undefined' && window.liff && window.liff.isInClient();
+    return typeof window !== 'undefined' && !!window.liff && window.liff.isInClient();
   } catch {
     return false;
+  }
+};
+
+export const closeLiffWindow = () => {
+  try {
+    if (window.liff && window.liff.isInClient()) {
+      window.liff.closeWindow();
+    } else {
+      window.close();
+    }
+  } catch (error) {
+    console.error('Error closing LIFF window:', error);
+    window.close();
   }
 };
 
@@ -128,6 +258,29 @@ export const parseQRData = (qrData: string) => {
     }
     return JSON.parse(qrData);
   } catch {
+    return null;
+  }
+};
+
+export const parseQRCode = (qrCodeData: string) => {
+  try {
+    if (!qrCodeData || typeof qrCodeData !== 'string') {
+      return null;
+    }
+    
+    const parsedData = JSON.parse(qrCodeData);
+    
+    // Validate QR code structure for YOAKE app
+    if (parsedData && 
+        parsedData.app === 'yoake' && 
+        parsedData.type === 'check-in' && 
+        parsedData.store_id) {
+      return parsedData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('QR Code parsing error:', error);
     return null;
   }
 };
@@ -245,36 +398,6 @@ export const retry = async <T>(
   throw lastError!;
 };
 
-// Validation utilities for forms
-export const validateSurveyData = (data: any): { isValid: boolean; errors: string[] } => {
-  const errors: string[] = [];
-  
-  if (!data.email || !validateEmail(data.email)) {
-    errors.push('有効なメールアドレスを入力してください');
-  }
-  
-  if (!data.birthDate || !validateBirthDate(data.birthDate)) {
-    errors.push('有効な生年月日を入力してください');
-  }
-  
-  if (!validateRequired(data.industry)) {
-    errors.push('業界を選択してください');
-  }
-  
-  if (!validateRequired(data.jobType)) {
-    errors.push('職種を選択してください');
-  }
-  
-  if (!validateRequired(data.experienceYears)) {
-    errors.push('経験年数を選択してください');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
-};
-
 // Error logging utility
 export const logError = (error: Error, context?: string): void => {
   console.error(`[ERROR] ${context ? `[${context}] ` : ''}${error.message}`, {
@@ -283,7 +406,7 @@ export const logError = (error: Error, context?: string): void => {
   });
 };
 
-// Constants
+// API endpoints constants
 export const API_ENDPOINTS = {
   REGISTER: '/api/register',
   LOGIN: '/api/login',
@@ -304,138 +427,16 @@ declare global {
       isLoggedIn: () => boolean;
       login: () => void;
       logout: () => void;
-      getProfile: () => Promise<any>;
+      getProfile: () => Promise<{
+        userId: string;
+        displayName: string;
+        pictureUrl?: string;
+        statusMessage?: string;
+      }>;
       getIDToken: () => string;
       closeWindow: () => void;
       sendMessages: (messages: any[]) => Promise<void>;
+      scanCodeV2: () => Promise<{ value: string } | null>;
     };
   }
 }
-
-
-// Local storage utilities (for client-side data persistence)
-export const setLocalStorage = (key: string, value: any): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error('Error setting localStorage:', error);
-  }
-};
-
-export const getLocalStorage = (key: string): any => {
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : null;
-  } catch (error) {
-    console.error('Error getting localStorage:', error);
-    return null;
-  }
-};
-
-export const removeLocalStorage = (key: string): void => {
-  try {
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error('Error removing localStorage:', error);
-  }
-};
-
-
-
-
-
-
-// Chart options (for MembershipCardPage) - formatChartDataは既存なのでskip
-export const chartOptions = {
-  responsive: true,
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-    },
-  },
-  maintainAspectRatio: false,
-};
-
-// Date utilities
-export const formatDate = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  } catch {
-    return dateString;
-  }
-};
-
-export const formatDateTime = (dateString: string): string => {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return dateString;
-  }
-};
-
-// QR Code parsing function (for StoreCheckinPage)
-export const parseQRCode = (qrCodeData: string) => {
-  try {
-    if (!qrCodeData || typeof qrCodeData !== 'string') {
-      return null;
-    }
-    
-    const parsedData = JSON.parse(qrCodeData);
-    
-    // Validate QR code structure for YOAKE app
-    if (parsedData && 
-        parsedData.app === 'yoake' && 
-        parsedData.type === 'check-in' && 
-        parsedData.store_id) {
-      return parsedData;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('QR Code parsing error:', error);
-    return null;
-  }
-};
-
-// LIFF window utility (for LIFF apps)
-export const closeLiffWindow = () => {
-  try {
-    if (window.liff && window.liff.isInClient()) {
-      window.liff.closeWindow();
-    } else {
-      // Fallback for external browser
-      window.close();
-    }
-  } catch (error) {
-    console.error('Error closing LIFF window:', error);
-    // Fallback
-    window.close();
-  }
-};
-
-// Form validation utilities
-export const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^[\d-+().\s]+$/;
-  return phoneRegex.test(phone) && phone.length >= 10;
-};
-
-export const validateRequired = (value: any): boolean => {
-  return value !== null && value !== undefined && value !== '';
-};
