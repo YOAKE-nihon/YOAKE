@@ -1,6 +1,3 @@
-// YOAKE Client Utilities
-// 完全修正版 - 重複削除、型エラー修正済み
-
 // Chart formatting utilities
 export const formatChartData = (data: Record<string, number>) => {
   const labels = Object.keys(data);
