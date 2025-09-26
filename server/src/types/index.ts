@@ -185,6 +185,7 @@ export interface Config {
     loginChannelId: string;
     loginChannelSecret?: string;
     messagingApiToken: string;
+    messagingChannelSecret?: string;  // Added for webhook signature validation
     liffIds: {
       register?: string;
       linking: string;

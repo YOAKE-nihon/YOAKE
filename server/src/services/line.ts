@@ -32,11 +32,6 @@ class LineService {
         return null;
       }
 
-      // Fix: Ensure parts[1] exists before using Buffer.from
-      if (!parts[1]) {
-        return null;
-      }
-
       const payload = Buffer.from(parts[1], 'base64url').toString();
       const parsed = JSON.parse(payload) as LineIdTokenPayload;
 
@@ -105,13 +100,16 @@ class LineService {
    */
   validateSignature(body: string, signature: string): boolean {
     try {
-      if (!lineConfig.loginChannelSecret) {
-        console.warn('LINE channel secret not configured');
+      // Use Messaging API channel secret for webhook validation
+      const channelSecret = lineConfig.messagingChannelSecret;
+      
+      if (!channelSecret) {
+        console.warn('LINE Messaging API channel secret not configured');
         return false;
       }
 
       const hash = crypto
-        .createHmac('sha256', lineConfig.loginChannelSecret)
+        .createHmac('sha256', channelSecret)
         .update(body)
         .digest('base64');
 
@@ -132,12 +130,15 @@ class LineService {
       switch (event.type) {
         case 'message':
           // Handle message events
+          console.log('Message event received:', event.message);
           break;
         case 'follow':
           // Handle follow events
+          console.log('Follow event received:', event.source);
           break;
         case 'unfollow':
           // Handle unfollow events
+          console.log('Unfollow event received:', event.source);
           break;
         default:
           console.log('Unknown event type:', event.type);
