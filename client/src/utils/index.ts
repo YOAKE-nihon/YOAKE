@@ -436,7 +436,7 @@ declare global {
       getIDToken: () => string;
       closeWindow: () => void;
       sendMessages: (messages: any[]) => Promise<void>;
-      scanCodeV2: () => Promise<{ value: string } | null>;
+      scanCodeV2: () => Promise<{ value: string } | null>; 
     };
   }
 }
