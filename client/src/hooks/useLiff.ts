@@ -1,50 +1,77 @@
-import { useState, useCallback } from 'react';
-import { ApiResponse } from '../types';
+import { useState, useEffect } from 'react';
 
-interface UseApiReturn<T = any> {
-  loading: boolean;
-  error: string | null;
-  execute: (apiCall: () => Promise<ApiResponse<T>>) => Promise<T | null>;
-  reset: () => void;
+interface Profile {
+  userId: string;
+  displayName: string;
+  pictureUrl?: string;
+  statusMessage?: string;
 }
 
-const useApi = <T = any>(): UseApiReturn<T> => {
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+interface UseLiffReturn {
+  isLoggedIn: boolean;
+  profile: Profile | null;
+  error: string | null;
+  loading: boolean;
+  login: () => Promise<void>;
+}
 
-  const execute = useCallback(async (apiCall: () => Promise<ApiResponse<T>>): Promise<T | null> => {
+const useLiff = (liffId: string): UseLiffReturn => {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const initLiff = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        if (!window.liff) {
+          throw new Error('LIFF SDKが読み込まれていません');
+        }
+
+        await window.liff.init({ liffId });
+
+        if (window.liff.isLoggedIn()) {
+          setIsLoggedIn(true);
+          const userProfile = await window.liff.getProfile();
+          setProfile({
+            userId: userProfile.userId,
+            displayName: userProfile.displayName,
+            pictureUrl: userProfile.pictureUrl,
+            statusMessage: userProfile.statusMessage,
+          });
+        }
+      } catch (err: any) {
+        console.error('LIFF初期化エラー:', err);
+        setError(err.message || 'LIFF初期化に失敗しました');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initLiff();
+  }, [liffId]);
+
+  const login = async (): Promise<void> => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await apiCall();
-      
-      if (response.success) {
-        return response.data || null;
-      } else {
-        setError(response.message || 'APIエラーが発生しました');
-        return null;
+      if (window.liff && !window.liff.isLoggedIn()) {
+        window.liff.login();
       }
     } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.message || 'ネットワークエラーが発生しました';
-      setError(errorMessage);
-      return null;
-    } finally {
-      setLoading(false);
+      console.error('ログインエラー:', err);
+      setError(err.message || 'ログインに失敗しました');
     }
-  }, []);
-
-  const reset = useCallback(() => {
-    setLoading(false);
-    setError(null);
-  }, []);
+  };
 
   return {
-    loading,
+    isLoggedIn,
+    profile,
     error,
-    execute,
-    reset,
+    loading,
+    login,
   };
 };
 
-export default useApi;
+export default useLiff;
