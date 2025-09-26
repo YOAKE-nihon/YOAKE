@@ -201,7 +201,7 @@ const PaymentPage: React.FC = () => {
       <div className="form-container">
         <h2 className="form-title">決済準備エラー</h2>
         <ErrorMessage 
-          message={error.message} 
+          message={error} 
           onRetry={() => window.location.reload()}
         />
         <div className="form-navigation" style={{ justifyContent: 'center', marginTop: '20px' }}>

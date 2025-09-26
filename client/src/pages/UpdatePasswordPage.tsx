@@ -121,7 +121,7 @@ const UpdatePasswordPage: React.FC = () => {
         </div>
       )}
       
-      {error && <ErrorMessage message={error.message} />}
+      {error && <ErrorMessage message={error} />}
       
       <form onSubmit={handleSubmit} className="form-content">
         <FormField 
