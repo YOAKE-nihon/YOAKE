@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "strict": false,
+    "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "module": "esnext",
@@ -19,15 +19,9 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "suppressImplicitAnyIndexErrors": true,
-    "noImplicitAny": false
+    "downlevelIteration": true
   },
   "include": [
     "src"
-  ],
-  "exclude": [
-    "node_modules",
-    "build",
-    "src/types/*.d.ts"
   ]
 }
