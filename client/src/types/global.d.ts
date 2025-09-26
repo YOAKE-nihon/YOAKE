@@ -1,4 +1,4 @@
-// グローバル型定義
+// LIFF SDK型定義
 declare global {
     interface Window {
       liff?: {
@@ -21,5 +21,4 @@ declare global {
     }
   }
   
-  // 空のexportでモジュールとして認識させる
   export {};
