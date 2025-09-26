@@ -1,38 +1,107 @@
+// Chart formatting utilities
+export const formatChartData = (data: Record<string, number>) => {
+  const labels = Object.keys(data);
+  const values = Object.values(data);
+  
+  return {
+    labels,
+    datasets: [
+      {
+        data: values,
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB', 
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40',
+          '#FF9F97',
+          '#4BC0C8',
+        ],
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverBorderWidth: 3,
+      },
+    ],
+  };
+};
+
+// Chart options
+export const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: {
+        padding: 20,
+        font: {
+          size: 12,
+        },
+        usePointStyle: true,
+      },
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => {
+          const label = context.label || '';
+          const value = context.parsed || 0;
+          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0);
+          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+          return `${label}: ${value}回 (${percentage}%)`;
+        },
+      },
+    },
+  },
+};
+
 // Date utilities
-export const formatDate = (date: Date): string => {
+export const formatDate = (dateString: string | Date): string => {
   try {
-    return new Intl.DateTimeFormat('ja-JP', {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    if (isNaN(date.getTime())) {
+      return '不明な日付';
+    }
+    return date.toLocaleDateString('ja-JP', {
       year: 'numeric',
-      month: 'numeric',
+      month: 'short',
       day: 'numeric',
-    }).format(date);
+    });
   } catch {
-    return date.toLocaleDateString();
+    return '不明な日付';
   }
 };
 
-export const formatDateTime = (date: Date): string => {
+export const formatDateTime = (dateString: string | Date): string => {
   try {
-    return new Intl.DateTimeFormat('ja-JP', {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    if (isNaN(date.getTime())) {
+      return '不明な日時';
+    }
+    return date.toLocaleString('ja-JP', {
       year: 'numeric',
-      month: 'numeric',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(date);
+    });
   } catch {
-    return date.toLocaleString();
+    return '不明な日時';
   }
 };
 
-export const formatTime = (date: Date): string => {
+export const formatTime = (dateString: string | Date): string => {
   try {
-    return new Intl.DateTimeFormat('ja-JP', {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    if (isNaN(date.getTime())) {
+      return '不明な時刻';
+    }
+    return date.toLocaleTimeString('ja-JP', {
       hour: '2-digit',
       minute: '2-digit',
-    }).format(date);
+    });
   } catch {
-    return date.toLocaleTimeString();
+    return '不明な時刻';
   }
 };
 
