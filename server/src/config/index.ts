@@ -1,46 +1,32 @@
 import dotenv from 'dotenv';
+import { Config } from '../types';
 
 // Load environment variables
 dotenv.config();
 
-export interface Config {
-  line: {
-    loginChannelId: string;
-    loginChannelSecret: string;
-    messagingApiToken: string;
-    liffIds: {
-      register?: string;
-      linking: string;
-      checkin?: string;
-      card?: string;
-      history?: string;
-    };
-    richMenuId: {
-      member?: string;
-    };
-  };
-  database: {
-    supabaseUrl: string;
-    supabaseKey: string;
-  };
-  stripe: {
-    secretKey: string;
-    publicKey?: string;
-  };
-  server: {
-    port: number;
-    nodeEnv: string;
-  };
-}
+const requiredEnvVars = [
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_KEY',
+  'LINE_MESSAGING_API_TOKEN',
+  'STRIPE_SECRET_KEY'
+];
 
-const config: Config = {
+// Check required environment variables
+requiredEnvVars.forEach(envVar => {
+  if (!process.env[envVar]) {
+    throw new Error(`Required environment variable ${envVar} is not set`);
+  }
+});
+
+export const config: Config = {
   line: {
     loginChannelId: process.env.LINE_LOGIN_CHANNEL_ID || '',
-    loginChannelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET || '',
-    messagingApiToken: process.env.LINE_MESSAGING_API_TOKEN || '',
+    loginChannelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET,
+    messagingApiToken: process.env.LINE_MESSAGING_API_TOKEN!,
+    messagingChannelSecret: process.env.LINE_MESSAGING_CHANNEL_SECRET,
     liffIds: {
       register: process.env.LIFF_ID_REGISTER,
-      linking: process.env.LIFF_ID_LINKING || '',
+      linking: process.env.LIFF_ID_LINKING!,
       checkin: process.env.LIFF_ID_CHECKIN,
       card: process.env.LIFF_ID_CARD,
       history: process.env.LIFF_ID_HISTORY,
@@ -50,11 +36,11 @@ const config: Config = {
     },
   },
   database: {
-    supabaseUrl: process.env.SUPABASE_URL || '',
-    supabaseKey: process.env.SUPABASE_SERVICE_KEY || '',
+    supabaseUrl: process.env.SUPABASE_URL!,
+    supabaseKey: process.env.SUPABASE_SERVICE_KEY!,
   },
   stripe: {
-    secretKey: process.env.STRIPE_SECRET_KEY || '',
+    secretKey: process.env.STRIPE_SECRET_KEY!,
     publicKey: process.env.STRIPE_PUBLISHABLE_KEY,
   },
   server: {
@@ -63,31 +49,7 @@ const config: Config = {
   },
 };
 
-// Validation
-const validateConfig = (): void => {
-  const required = [
-    'LINE_MESSAGING_API_TOKEN',
-    'SUPABASE_URL',
-    'SUPABASE_SERVICE_KEY',
-    'STRIPE_SECRET_KEY',
-  ];
-
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0) {
-    console.error('Missing required environment variables:', missing);
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
-  }
-};
-
-// Validate configuration on import
-if (config.server.nodeEnv === 'production') {
-  validateConfig();
-}
-
-export { config };
-
-// Individual config exports for convenience
+// Derived configurations
 export const lineConfig = config.line;
 export const databaseConfig = config.database;
 export const stripeConfig = config.stripe;

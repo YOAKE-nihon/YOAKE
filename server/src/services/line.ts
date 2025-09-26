@@ -28,11 +28,12 @@ class LineService {
 
       // Parse the JWT token (simplified - should verify signature in production)
       const parts = idToken.split('.');
-      if (parts.length !== 3) {
+      if (parts.length !== 3 || !parts[1]) {
         return null;
       }
 
-      const payload = Buffer.from(parts[1], 'base64url').toString();
+      // Use base64 instead of base64url for compatibility
+      const payload = Buffer.from(parts[1], 'base64').toString();
       const parsed = JSON.parse(payload) as LineIdTokenPayload;
 
       // Basic validation
