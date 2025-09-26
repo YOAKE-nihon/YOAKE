@@ -100,12 +100,12 @@ const VisitHistoryPage: React.FC = () => {
         {history.map(visit => (
           <li key={visit.id} className="history-item">
             <div className="history-date">
-              {formatDate(visit.checkInAt)}
+              {formatDate(visit.check_in_at)}
             </div>
             <div className="history-details">
-              <span className="history-store">{visit.storeName}</span>
+              <span className="history-store">{visit.store_name || '不明な店舗'}</span>
               <span className="history-purpose">
-                {visit.visitPurpose || '目的未設定'}
+                {visit.visit_purpose || '目的未設定'}
               </span>
             </div>
           </li>
