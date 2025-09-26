@@ -197,3 +197,32 @@ export type SideJobChallenge = typeof SIDE_JOB_CHALLENGE_OPTIONS[number];
 export type MeetPeople = typeof MEET_PEOPLE_OPTIONS[number];
 export type ServiceBenefit = typeof SERVICE_BENEFIT_OPTIONS[number];
 export type ServicePriority = typeof SERVICE_PRIORITY_OPTIONS[number];
+
+// QR Code data structure
+export interface QRCodeData {
+  app: string;
+  type: string;
+  store_id: string;
+  timestamp?: number;
+}
+
+// LIFF Window interface
+declare global {
+  interface Window {
+    liff: {
+      init: (config: { liffId: string }) => Promise<void>;
+      isLoggedIn: () => boolean;
+      isInClient: () => boolean;
+      login: () => void;
+      logout: () => void;
+      getProfile: () => Promise<{
+        userId: string;
+        displayName: string;
+        pictureUrl?: string;
+        statusMessage?: string;
+      }>;
+      scanCodeV2: () => Promise<{ value: string } | null>;
+      closeWindow: () => void;
+    };
+  }
+}

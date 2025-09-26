@@ -417,3 +417,190 @@ declare global {
     };
   }
 }
+
+// Chart utilities (for MembershipCardPage)
+export const formatChartData = (data: Record<string, number>) => {
+  const labels = Object.keys(data);
+  const values = Object.values(data);
+  
+  return {
+    labels,
+    datasets: [
+      {
+        data: values,
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB', 
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40'
+        ],
+        borderWidth: 1,
+      }
+    ]
+  };
+};
+
+export const chartOptions = {
+  responsive: true,
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+    },
+  },
+  maintainAspectRatio: false,
+};
+
+// Date utilities
+export const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+};
+
+export const formatDateTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return dateString;
+  }
+};
+
+// QR Code parsing function (for StoreCheckinPage)
+export const parseQRCode = (qrCodeData: string) => {
+  try {
+    if (!qrCodeData || typeof qrCodeData !== 'string') {
+      return null;
+    }
+    
+    const parsedData = JSON.parse(qrCodeData);
+    
+    // Validate QR code structure for YOAKE app
+    if (parsedData && 
+        parsedData.app === 'yoake' && 
+        parsedData.type === 'check-in' && 
+        parsedData.store_id) {
+      return parsedData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('QR Code parsing error:', error);
+    return null;
+  }
+};
+
+// LIFF window utility (for LIFF apps)
+export const closeLiffWindow = () => {
+  try {
+    if (window.liff && window.liff.isInClient()) {
+      window.liff.closeWindow();
+    } else {
+      // Fallback for external browser
+      window.close();
+    }
+  } catch (error) {
+    console.error('Error closing LIFF window:', error);
+    // Fallback
+    window.close();
+  }
+};
+
+// Local storage utilities (for client-side data persistence)
+export const setLocalStorage = (key: string, value: any): void => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error('Error setting localStorage:', error);
+  }
+};
+
+export const getLocalStorage = (key: string): any => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : null;
+  } catch (error) {
+    console.error('Error getting localStorage:', error);
+    return null;
+  }
+};
+
+export const removeLocalStorage = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error('Error removing localStorage:', error);
+  }
+};
+
+// Form validation utilities
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+export const validatePhone = (phone: string): boolean => {
+  const phoneRegex = /^[\d-+().\s]+$/;
+  return phoneRegex.test(phone) && phone.length >= 10;
+};
+
+export const validateRequired = (value: any): boolean => {
+  return value !== null && value !== undefined && value !== '';
+};
+
+// 既存のコードはそのまま残して、以下を最後に追加
+
+// QR Code parsing function (alias for compatibility)
+export const parseQRCode = (qrCodeData: string) => {
+  try {
+    if (!qrCodeData || typeof qrCodeData !== 'string') {
+      return null;
+    }
+    
+    const parsedData = JSON.parse(qrCodeData);
+    
+    // Validate QR code structure
+    if (parsedData && 
+        parsedData.app === 'yoake' && 
+        parsedData.type === 'check-in' && 
+        parsedData.store_id) {
+      return parsedData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('QR Code parsing error:', error);
+    return null;
+  }
+};
+
+// LIFF window utility (also missing)
+export const closeLiffWindow = () => {
+  try {
+    if (window.liff && window.liff.isInClient()) {
+      window.liff.closeWindow();
+    } else {
+      // Fallback for external browser
+      window.close();
+    }
+  } catch (error) {
+    console.error('Error closing LIFF window:', error);
+    // Fallback
+    window.close();
+  }
+};
