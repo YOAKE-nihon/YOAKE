@@ -2,22 +2,23 @@ import React from 'react';
 
 interface FormFieldProps {
   label: string;
-  name: string;
+  name?: string;
   type?: 'text' | 'email' | 'tel' | 'date' | 'select' | 'checkbox' | 'radio' | 'textarea';
   value?: string | string[];
   options?: { value: string; label: string }[];
   placeholder?: string;
   required?: boolean;
   error?: string;
-  onChange: (name: string, value: any) => void;
+  onChange?: (name: string, value: any) => void;
   multiple?: boolean;
   className?: string;
   disabled?: boolean;
+  children?: React.ReactNode; // 子要素サポートを追加
 }
 
 const FormField: React.FC<FormFieldProps> = ({
   label,
-  name,
+  name = '',
   type = 'text',
   value = '',
   options = [],
@@ -28,8 +29,11 @@ const FormField: React.FC<FormFieldProps> = ({
   multiple = false,
   className = '',
   disabled = false,
+  children, // 子要素を受け取る
 }) => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (!onChange || !name) return;
+    
     const target = e.target;
     
     if (type === 'checkbox' && multiple) {
@@ -48,6 +52,12 @@ const FormField: React.FC<FormFieldProps> = ({
   };
 
   const renderField = () => {
+    // 子要素が渡された場合はそれを使用
+    if (children) {
+      return children;
+    }
+
+    // 従来の内部レンダリング
     switch (type) {
       case 'select':
         return (
