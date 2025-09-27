@@ -28,14 +28,36 @@ const useLiff = (liffId: string): UseLiffReturn => {
         setLoading(true);
         setError(null);
 
-        // window.liff を使用（型定義は別ファイルで拡張）
+        // LIFF SDK の読み込み完了を待機
+        const waitForLiff = () => {
+          return new Promise<void>((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 30; // 3秒間待機
+            
+            const checkLiff = () => {
+              if (window.liff) {
+                resolve();
+              } else if (attempts >= maxAttempts) {
+                reject(new Error('LIFF SDKの読み込みがタイムアウトしました'));
+              } else {
+                attempts++;
+                setTimeout(checkLiff, 100);
+              }
+            };
+            
+            checkLiff();
+          });
+        };
+
+        await waitForLiff();
+
         if (!window.liff) {
           throw new Error('LIFF SDKが読み込まれていません');
         }
 
         await window.liff.init({ liffId });
 
-        if (window.liff.isLoggedIn()) {
+        if (window.liff.isLoggedIn?.()) {
           setIsLoggedIn(true);
           const userProfile = await window.liff.getProfile();
           setProfile({
@@ -58,8 +80,8 @@ const useLiff = (liffId: string): UseLiffReturn => {
 
   const login = async (): Promise<void> => {
     try {
-      if (window.liff && !window.liff.isLoggedIn()) {
-        window.liff.login();
+      if (window.liff && !window.liff.isLoggedIn?.()) {
+        window.liff.login?.();
       }
     } catch (err: any) {
       console.error('ログインエラー:', err);
@@ -69,7 +91,7 @@ const useLiff = (liffId: string): UseLiffReturn => {
 
   const getIdToken = (): string | null => {
     try {
-      if (window.liff && window.liff.isLoggedIn() && window.liff.getIDToken) {
+      if (window.liff && window.liff.isLoggedIn?.() && window.liff.getIDToken) {
         return window.liff.getIDToken();
       }
       return null;
