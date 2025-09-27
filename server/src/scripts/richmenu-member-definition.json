@@ -1,36 +1,40 @@
 {
-    "size": { "width": 2500, "height": 1686 },
-    "selected": true,
-    "name": "会員向けメニュー",
-    "chatBarText": "メニュー",
-    "areas": [
-    
-      {
-        "bounds": { "x": 0, "y": 0, "width": 833.33, "height": 843 },
-        "action": { "type": "uri", "label": "会員証表示", "uri": "https://liff.line.me/2007607164-L1kOxwO6" }
-      },
-      {
-        "bounds": { "x": 833.33, "y": 0, "width": 833.33, "height": 843 },
-        "action": { "type": "uri", "label": "店舗認証", "uri": "https://liff.line.me/2007607164-Rje7m170" }
-      },
-      {
-      "bounds": { "x": 1666.66, "y": 0, "width": 833.33, "height": 843 },
-      "action": { "type": "uri", "label": "アプリの使い方", "uri": "https://liff.line.me/YOUR_STORE_CHECKIN_LIFF_ID" }
-      },
-
-
-      {
-        "bounds": { "x": 0, "y": 843, "width": 833.33, "height": 843 },
-        "action": { "type": "uri", "label": "ドリンク一覧", "uri": "https://your-website.com/" }
-      },
-      {
-        "bounds": { "x": 833.33, "y": 843, "width": 833.33, "height": 843 },
-        "action": { "type": "uri", "label": "提携希望", "uri": "https://liff.line.me/YOUR_STORE_CHECKIN_LIFF_ID" }
-      },
-      {
-      "bounds": { "x": 1666.66, "y": 843, "width": 833.33, "height": 843 },
-      "action": { "type": "uri", "label": "Q&A", "uri": "https://liff.line.me/YOUR_STORE_CHECKIN_LIFF_ID" }
+  "size": { "width": 2500, "height": 1686 },
+  "selected": true,
+  "name": "会員向けメニュー",
+  "chatBarText": "メニュー",
+  "areas": [
+    {
+      "bounds": { "x": 0, "y": 0, "width": 1250, "height": 843 },
+      "action": { 
+        "type": "uri", 
+        "label": "会員証", 
+        "uri": "https://liff.line.me/2007978802-GbqBXmYM" 
       }
-    ]
-  }
-  
+    },
+    {
+      "bounds": { "x": 1250, "y": 0, "width": 1250, "height": 843 },
+      "action": { 
+        "type": "uri", 
+        "label": "QR読み取り", 
+        "uri": "https://liff.line.me/2007978802-Vy612enm" 
+      }
+    },
+    {
+      "bounds": { "x": 0, "y": 843, "width": 1250, "height": 843 },
+      "action": { 
+        "type": "uri", 
+        "label": "ドリンク一覧", 
+        "uri": "https://your-website.com/drinks" 
+      }
+    },
+    {
+      "bounds": { "x": 1250, "y": 843, "width": 1250, "height": 843 },
+      "action": { 
+        "type": "uri", 
+        "label": "Q&A", 
+        "uri": "https://your-website.com/faq" 
+      }
+    }
+  ]
+}
