@@ -16,6 +16,7 @@ import {
 import authRoutes from './routes/auth';
 import paymentRoutes from './routes/payment';
 import userRoutes from './routes/user';
+import webhookRoutes from './routes/webhook';
 
 const app = express();
 
@@ -42,16 +43,38 @@ app.use(rateLimitMiddleware);
 // Body parsing middleware
 app.use('/api/webhook/stripe', express.raw({ type: 'application/json' }));
 app.use('/api/webhook/line', express.raw({ type: 'application/json' }));
+app.use('/api/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check endpoint
 app.get('/health', healthCheck);
 
+// Root path handling
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'YOAKE API Server',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      frontend: 'https://yoake-frontend.onrender.com'
+    }
+  });
+});
+
+// Handle HEAD requests to root (for health checks)
+app.head('/', (req, res) => {
+  res.status(200).end();
+});
+
 // API routes
 app.use('/api', authRoutes);
 app.use('/api', paymentRoutes);
 app.use('/api', userRoutes);
+app.use('/api', webhookRoutes);
 
 // Basic API test endpoint
 app.get('/api/test', (req, res) => {
@@ -63,7 +86,7 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// LINE webhook endpoint (special handling for raw body)
+// LINE webhook endpoint (legacy - keep for backward compatibility)
 app.post('/api/webhook/line', asyncWrapper(async (req: express.Request, res: express.Response) => {
   try {
     const signature = req.headers['x-line-signature'] as string;
@@ -91,7 +114,7 @@ app.post('/api/webhook/line', asyncWrapper(async (req: express.Request, res: exp
       await lineService.handleWebhookEvent(event);
     }
 
-    res.json({ status: 'ok' });
+    res.status(200).json({ status: 'ok' });
   } catch (error) {
     console.error('LINE webhook error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
@@ -104,6 +127,7 @@ app.use('*', (req, res) => {
     success: false,
     message: `エンドポイント ${req.method} ${req.originalUrl} が見つかりません`,
     timestamp: new Date().toISOString(),
+    suggestion: 'フロントエンドには https://yoake-frontend.onrender.com でアクセスしてください'
   });
 });
 
@@ -148,6 +172,10 @@ const server = app.listen(config.server.port, () => {
   console.log(`📡 Server listening on port ${config.server.port}`);
   console.log(`🌍 Environment: ${config.server.nodeEnv}`);
   console.log(`📊 Health check available at: /health`);
+  console.log(`🔗 Webhook endpoints:`);
+  console.log(`   - /api/webhook (general)`);
+  console.log(`   - /api/webhook/line (specific)`);
+  console.log(`🌐 Frontend URL: https://yoake-frontend.onrender.com`);
 });
 
 export default app;
