@@ -16,7 +16,7 @@ import {
 import authRoutes from './routes/auth';
 import paymentRoutes from './routes/payment';
 import userRoutes from './routes/user';
-import webhookRoutes from './routes/webhook';
+//import webhookRoutes from './routes/webhook';
 
 const app = express();
 
@@ -74,7 +74,7 @@ app.head('/', (req, res) => {
 app.use('/api', authRoutes);
 app.use('/api', paymentRoutes);
 app.use('/api', userRoutes);
-app.use('/api', webhookRoutes);
+//app.use('/api', webhookRoutes);
 
 // Basic API test endpoint
 app.get('/api/test', (req, res) => {
